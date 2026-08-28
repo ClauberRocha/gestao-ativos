@@ -1,0 +1,16 @@
+# Project TODO
+
+- [x] Configurar integração com Supabase para autenticação e banco de dados.
+- [x] Criar tabela `assets` com patrimônio, descrição, número de série, conta cliente, local, status, conservação, valor de aquisição e observações.
+- [x] Implementar roles `admin` e `operador` com RLS; restringir exclusão e visualização de valor de aquisição a administradores.
+- [x] Inserir dados de exemplo realistas para Totens, Pin Pads e Desktops.
+- [x] Construir inventário corporativo data-heavy com Tailwind e shadcn/ui.
+- [x] Implementar paginação, busca rápida por patrimônio e número de série e filtro por status.
+- [x] Aplicar cores semânticas aos status: verde para Ativo, amarelo para Em estoque, vermelho para Defeito.
+- [x] Validar a busca rápida antes de avançar para o Dashboard e o CRUD completo.
+- [x] Implementar Dashboard com KPIs de Total de Ativos, Em Estoque, Em Clientes e Com Defeito.
+- [x] Implementar painel lateral para visualizar, editar e cadastrar ativos.
+- [x] Validar estados de loading/erro/vazio, testes Vitest, build e responsividade.
+- [ ] Validar autenticação Supabase ponta a ponta com uma conta real.
+- [ ] Confirmar no Supabase a aplicação da migration, a view `assets_inventory` e as policies RLS com perfis admin/operador.
+- [x] Refinar a direção visual para uma interface corporativa, elegante, limpa e de alta densidade de dados.
