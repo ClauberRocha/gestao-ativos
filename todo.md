@@ -17,11 +17,11 @@
 - [x] Endurecer funções Supabase com `search_path` fixo e remover exposição pública de funções `SECURITY DEFINER`.
 - [x] Reexecutar advisor de segurança após o endurecimento e documentar alertas externos restantes.
 - [x] Confirmar via banco que `email_confirmed_at` foi preenchido após a confirmação do e-mail.
-- [ ] Validar no app uma leitura autenticada e uma ação protegida com a sessão admin, como salvar uma alteração operacional em um ativo.
+- [x] Validar no app uma leitura autenticada e uma ação protegida com a sessão admin, como salvar uma alteração operacional em um ativo.
 - [x] Corrigir o painel de edição para exibir o botão `Salvar alterações` e conectar o submit à atualização protegida no Supabase.
-- [ ] Validar visualmente o botão, o estado de loading e o toast de sucesso após salvar uma alteração autenticada.
+- [x] Validar visualmente o botão, o estado de loading e o toast de sucesso após salvar uma alteração autenticada.
 - [x] Renomear a aplicação visível para `Mr Pay Ativos` no título, marca, navegação e rodapé.
 - [x] Investigar o erro `Não foi possível salvar` no update de ativos e corrigir o fluxo de atualização autenticada.
-- [ ] Validar com evidência verificável um update protegido no app após a correção.
+- [x] Validar com evidência verificável um update protegido no app após a correção.
 - [x] Após salvar um ativo, exibir `Ativo Salvo com sucesso` e trocar o botão de ação para `Fechar` sem fechar automaticamente o painel.
 - [x] Validar o novo estado pós-salvamento com testes automatizados e build.
