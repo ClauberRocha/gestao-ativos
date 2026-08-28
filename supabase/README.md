@@ -23,3 +23,7 @@ A sessão deve ser encerrada e iniciada novamente para atualizar o perfil carreg
 ## Permissões
 
 Operadores autenticados podem consultar a view, inserir ativos e atualizar dados operacionais. Apenas administradores podem excluir registros e enxergar ou editar o valor de aquisição. O navegador usa somente a chave pública; nunca coloque `service_role` em variáveis `VITE_*` ou no código do cliente.
+
+## Revisão de segurança
+
+Após o hardening, o Supabase Advisor não reporta mais funções expostas, `search_path` mutável ou extensão no schema público. Permanece apenas o aviso de produto **Leaked Password Protection Disabled**; habilite-o no painel do Supabase em **Authentication → Password Security** para bloquear senhas comprometidas. Essa configuração é gerenciada pelo projeto Supabase e não exige qualquer segredo no Web App.

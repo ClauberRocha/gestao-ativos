@@ -2,7 +2,11 @@
 -- Execute este arquivo no SQL Editor do projeto Supabase.
 
 create extension if not exists pgcrypto;
-create extension if not exists pg_trgm;
+create schema if not exists extensions;
+create extension if not exists pg_trgm with schema extensions;
+
+create schema if not exists private;
+revoke all on schema private from public;
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -12,10 +16,10 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
-create or replace function public.handle_new_user()
+create or replace function private.handle_new_user()
 returns trigger
 language plpgsql
-security definer set search_path = public
+security definer set search_path = public, auth
 as $$
 begin
   insert into public.profiles (id, full_name)
@@ -25,10 +29,11 @@ begin
 end;
 $$;
 
+revoke all on function private.handle_new_user() from public;
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
 after insert on auth.users
-for each row execute procedure public.handle_new_user();
+for each row execute procedure private.handle_new_user();
 
 create table if not exists public.assets (
   id uuid primary key default gen_random_uuid(),
@@ -45,14 +50,15 @@ create table if not exists public.assets (
   updated_at timestamptz not null default now()
 );
 
-create index if not exists assets_patrimonio_idx on public.assets using gin (patrimonio gin_trgm_ops);
-create index if not exists assets_numero_serie_idx on public.assets using gin (numero_serie gin_trgm_ops);
+create index if not exists assets_patrimonio_idx on public.assets using gin (patrimonio extensions.gin_trgm_ops);
+create index if not exists assets_numero_serie_idx on public.assets using gin (numero_serie extensions.gin_trgm_ops);
 create index if not exists assets_status_idx on public.assets (status);
 create index if not exists assets_cliente_idx on public.assets (conta_cliente);
 
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.updated_at = now();
@@ -70,7 +76,7 @@ create trigger assets_set_updated_at
 before update on public.assets
 for each row execute procedure public.set_updated_at();
 
-create or replace function public.is_admin()
+create or replace function private.is_admin()
 returns boolean
 language sql
 stable
@@ -81,6 +87,10 @@ as $$
     where id = auth.uid() and role = 'admin'
   );
 $$;
+
+revoke all on function private.is_admin() from public;
+grant usage on schema private to authenticated;
+grant execute on function private.is_admin() to authenticated;
 
 alter table public.profiles enable row level security;
 alter table public.assets enable row level security;
@@ -114,12 +124,12 @@ drop policy if exists "Only admins can delete assets" on public.assets;
 create policy "Only admins can delete assets"
 on public.assets for delete
 to authenticated
-using (public.is_admin());
+using (private.is_admin());
 
 -- A view segura evita expor valor_aquisicao para operadores.
 drop view if exists public.assets_inventory;
 create view public.assets_inventory
-with (security_invoker = true)
+with (security_invoker = false)
 as
 select
   id,
@@ -130,7 +140,7 @@ select
   local,
   status,
   conservacao,
-  case when public.is_admin() then valor_aquisicao else null end as valor_aquisicao,
+  case when private.is_admin() then valor_aquisicao else null end as valor_aquisicao,
   observacoes,
   created_at,
   updated_at
@@ -138,6 +148,7 @@ from public.assets;
 
 -- Nunca exponha a tabela bruta via PostgREST: ela contém valor_aquisicao.
 revoke select on public.assets from anon, authenticated;
+grant select (id) on public.assets to authenticated;
 grant insert, update, delete on public.assets to authenticated;
 grant select on public.assets_inventory to authenticated;
 
