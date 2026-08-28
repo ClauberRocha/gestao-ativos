@@ -21,7 +21,7 @@
 - [x] Corrigir o painel de edição para exibir o botão `Salvar alterações` e conectar o submit à atualização protegida no Supabase.
 - [ ] Validar visualmente o botão, o estado de loading e o toast de sucesso após salvar uma alteração autenticada.
 - [x] Renomear a aplicação visível para `Mr Pay Ativos` no título, marca, navegação e rodapé.
-- [ ] Investigar o erro `Não foi possível salvar` no update de ativos e corrigir o fluxo de atualização autenticada.
+- [x] Investigar o erro `Não foi possível salvar` no update de ativos e corrigir o fluxo de atualização autenticada.
 - [ ] Validar com evidência verificável um update protegido no app após a correção.
-- [ ] Após salvar um ativo, exibir `Ativo salvo com sucesso` e trocar o botão de ação para `Fechar` sem fechar automaticamente o painel.
-- [ ] Validar o novo estado pós-salvamento com testes e build.
+- [x] Após salvar um ativo, exibir `Ativo Salvo com sucesso` e trocar o botão de ação para `Fechar` sem fechar automaticamente o painel.
+- [x] Validar o novo estado pós-salvamento com testes automatizados e build.
