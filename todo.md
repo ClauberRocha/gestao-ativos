@@ -26,3 +26,5 @@
 - [x] Após salvar um ativo, exibir `Ativo Salvo com sucesso` e trocar o botão de ação para `Fechar` sem fechar automaticamente o painel.
 - [x] Validar o novo estado pós-salvamento com testes automatizados e build.
 - [x] Alterar `Asset operations` para `Operações de Ativos` no menu lateral.
+- [x] Adicionar a logo da Mr Pay acima do nome `Mr Pay Ativos` no menu lateral.
+- [x] Alterar `Asset command center` para `Centro de Comando de Ativos` no destaque principal.

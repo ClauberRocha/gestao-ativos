@@ -112,6 +112,7 @@ function DashboardLayoutContent({ children, setSidebarWidth, user, onOpenAuth, o
               </button>
               {!isCollapsed && (
                 <div className="min-w-0">
+                  <img src={import.meta.env.VITE_APP_LOGO || undefined} alt="Mr Pay" className="mb-2 h-7 max-w-[118px] object-contain object-left" onError={(event) => { event.currentTarget.style.display = "none"; }} />
                   <div className="flex items-center gap-2">
                     <span className="size-2 rounded-full bg-emerald-500" />
                     <span className="truncate text-sm font-semibold tracking-tight">Mr Pay Ativos</span>
