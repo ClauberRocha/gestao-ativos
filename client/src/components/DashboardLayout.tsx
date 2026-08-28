@@ -116,7 +116,7 @@ function DashboardLayoutContent({ children, setSidebarWidth, user, onOpenAuth, o
                     <span className="size-2 rounded-full bg-emerald-500" />
                     <span className="truncate text-sm font-semibold tracking-tight">Mr Pay Ativos</span>
                   </div>
-                  <p className="mt-0.5 truncate text-[10px] font-medium uppercase tracking-[0.18em] text-sidebar-foreground/45">Asset operations</p>
+                  <p className="mt-0.5 truncate text-[10px] font-medium uppercase tracking-[0.18em] text-sidebar-foreground/45">Operações de Ativos</p>
                 </div>
               )}
             </div>

@@ -25,3 +25,4 @@
 - [x] Validar com evidência verificável um update protegido no app após a correção.
 - [x] Após salvar um ativo, exibir `Ativo Salvo com sucesso` e trocar o botão de ação para `Fechar` sem fechar automaticamente o painel.
 - [x] Validar o novo estado pós-salvamento com testes automatizados e build.
+- [x] Alterar `Asset operations` para `Operações de Ativos` no menu lateral.
