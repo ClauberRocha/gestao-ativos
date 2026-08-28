@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { getNextTheme } from "@/lib/theme";
 
 type Theme = "light" | "dark";
 
@@ -44,7 +45,7 @@ export function ThemeProvider({
 
   const toggleTheme = switchable
     ? () => {
-        setTheme(prev => (prev === "light" ? "dark" : "light"));
+        setTheme(prev => getNextTheme(prev));
       }
     : undefined;
 

@@ -14,8 +14,10 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
-import { Archive, BarChart3, ChevronRight, LogIn, LogOut, PanelLeft, Settings2 } from "lucide-react";
+import { getThemeToggleLabel, getThemeToggleTitle } from "@/lib/theme";
+import { Archive, BarChart3, ChevronRight, LogIn, LogOut, Moon, PanelLeft, Settings2, Sun } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 
 const menuItems = [
@@ -69,6 +71,7 @@ type LayoutContentProps = {
 
 function DashboardLayoutContent({ children, setSidebarWidth, user, onOpenAuth, onSignOut }: LayoutContentProps) {
   const { state, toggleSidebar } = useSidebar();
+  const { theme, toggleTheme } = useTheme();
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -112,7 +115,9 @@ function DashboardLayoutContent({ children, setSidebarWidth, user, onOpenAuth, o
               </button>
               {!isCollapsed && (
                 <div className="min-w-0">
-                  <img src={import.meta.env.VITE_APP_LOGO || undefined} alt="Mr Pay" className="mb-2 h-7 max-w-[118px] object-contain object-left" onError={(event) => { event.currentTarget.style.display = "none"; }} />
+                  <div className="mb-2 flex h-8 w-fit max-w-[126px] items-center rounded-md bg-white px-1.5 py-1 shadow-sm ring-1 ring-white/10 dark:bg-white">
+                    {import.meta.env.VITE_APP_LOGO ? <img src={import.meta.env.VITE_APP_LOGO} alt="Mr Pay" className="max-h-6 max-w-[114px] object-contain object-left" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : <span className="px-1 text-[10px] font-extrabold tracking-[0.14em] text-slate-950">MR PAY</span>}
+                  </div>
                   <div className="flex items-center gap-2">
                     <span className="size-2 rounded-full bg-emerald-500" />
                     <span className="truncate text-sm font-semibold tracking-tight">Mr Pay Ativos</span>
@@ -191,6 +196,7 @@ function DashboardLayoutContent({ children, setSidebarWidth, user, onOpenAuth, o
             <span className="hidden items-center gap-2 rounded-full border border-border/70 bg-card px-3 py-1.5 text-[11px] font-medium text-muted-foreground sm:flex">
               <span className="size-1.5 rounded-full bg-emerald-500" /> Sistema online
             </span>
+            {toggleTheme && <Button type="button" variant="outline" size="icon" onClick={toggleTheme} aria-label={getThemeToggleLabel(theme)} title={getThemeToggleTitle(theme)} className="size-9 rounded-xl bg-card">{theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}</Button>}
             {!user && <Button onClick={onOpenAuth} size="sm" className="h-9 rounded-xl px-3 text-xs shadow-sm"><LogIn className="mr-1.5 size-3.5" /> Entrar</Button>}
           </div>
         </div>

@@ -28,3 +28,8 @@
 - [x] Alterar `Asset operations` para `Operações de Ativos` no menu lateral.
 - [x] Adicionar a logo da Mr Pay acima do nome `Mr Pay Ativos` no menu lateral.
 - [x] Alterar `Asset command center` para `Centro de Comando de Ativos` no destaque principal.
+- [x] Adicionar favicon personalizado usando a logo da Mr Pay.
+- [x] Implementar alternância entre modo claro e escuro.
+- [x] Adaptar a logo para permanecer legível nos dois temas.
+- [x] Adicionar animação suave de carregamento na busca/listagem de ativos.
+- [x] Validar tema, favicon, carregamento e regressões com testes e revisão visual.
