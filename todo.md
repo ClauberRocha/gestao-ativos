@@ -54,3 +54,4 @@
 - [x] Verificar no teste integrado que o clique em `Visão geral` atualiza o hash real para `#visao-geral`.
 - [x] Registrar revisão textual explícita da captura mobile confirmando a legibilidade de `Patrimônio`, descrição e texto de apoio no Sheet aberto.
 - [x] Adicionar teste integrado de `Home` + `DashboardLayout` que clique em `Visão geral` e confirme o hash real sem mockar a atualização.
+- [x] Corrigir a logo do Mr Pay Ativos e validar sua aplicação no menu lateral, tema e favicon.

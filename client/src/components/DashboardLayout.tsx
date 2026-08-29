@@ -17,6 +17,7 @@ import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
 import { getThemeToggleLabel, getThemeToggleTitle } from "@/lib/theme";
+import { MR_PAY_LOGO_URL } from "@/lib/brand";
 import { canCreateUsers } from "@/lib/user-permissions";
 import { Archive, BarChart3, ChevronRight, LogIn, LogOut, Moon, PanelLeft, Settings2, Sun, UserRound } from "lucide-react";
 import React, { CSSProperties, useEffect, useRef, useState } from "react";
@@ -133,8 +134,8 @@ function DashboardLayoutContent({ children, setSidebarWidth, user, onOpenAuth, o
               </button>
               {!isCollapsed && (
                 <div className="min-w-0">
-                  <div className="mb-2 flex h-8 w-fit max-w-[126px] items-center rounded-md bg-white px-1.5 py-1 shadow-sm ring-1 ring-white/10 dark:bg-white">
-                    {import.meta.env.VITE_APP_LOGO ? <img src={import.meta.env.VITE_APP_LOGO} alt="Mr Pay" className="max-h-6 max-w-[114px] object-contain object-left" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : <span className="px-1 text-[10px] font-extrabold tracking-[0.14em] text-slate-950">MR PAY</span>}
+                  <div className="mb-2 flex h-10 w-[124px] items-center rounded-md bg-white px-2 py-1 shadow-sm ring-1 ring-white/10 dark:bg-white">
+                    <img src={MR_PAY_LOGO_URL} alt="Mr Pay" loading="eager" decoding="async" className="h-auto max-h-9 w-full object-contain object-left" onError={(event) => { event.currentTarget.style.display = "none"; }} />
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="size-2 rounded-full bg-emerald-500" />
