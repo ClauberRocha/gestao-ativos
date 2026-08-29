@@ -33,3 +33,24 @@
 - [x] Adaptar a logo para permanecer legível nos dois temas.
 - [x] Adicionar animação suave de carregamento na busca/listagem de ativos.
 - [x] Validar tema, favicon, carregamento e regressões com testes e revisão visual.
+- [x] Criar botão e fluxo seguro para criação de usuários.
+- [x] Fazer o botão `Visão Geral` navegar para a visão geral funcional.
+- [x] Corrigir sobreposição no formulário lateral para leitura clara de `Patrimônio`, descrição e texto de apoio.
+- [x] Validar tecnicamente criação de usuário, navegação, responsividade e regressões com testes/build.
+- [x] Adicionar botão visível `Criar usuário` no menu lateral e no cabeçalho para administradores.
+- [x] Conectar o botão ao fluxo de cadastro Supabase com feedback de sucesso/erro.
+- [x] Validar visibilidade por role, formulário e build do novo fluxo de usuários.
+- [x] Validar no preview, com sessão admin, que os botões `Criar usuário` aparecem no menu lateral e no cabeçalho e abrem o formulário em modo cadastro.
+- [x] Validar no preview, com sessão não admin ou deslogada, que o botão `Criar usuário` não aparece.
+- [x] Adicionar teste automatizado do fluxo de abertura em modo cadastro e das regras de visibilidade por role.
+- [x] Restringir o modo de cadastro do AuthDialog a administradores e impedir auto cadastro não autorizado.
+- [x] Implementar navegação real para `Visão Geral` com âncora/ref e estado ativo funcional.
+- [x] Validar visualmente o formulário lateral corrigido em desktop e mobile.
+- [x] Adicionar testes de lógica/UI para abertura de Criar usuário e acionamento da Visão Geral.
+- [x] Validar visualmente o formulário lateral em viewport mobile específica após a correção de sobreposição.
+- [x] Adicionar teste de integração que clique em `Criar usuário` e verifique a abertura do diálogo em modo cadastro.
+- [x] Adicionar teste de UI que acione `Visão geral` e verifique callback, hash e estado ativo.
+- [x] Capturar o Sheet aberto em viewport mobile e verificar visualmente `Patrimônio`, descrição e texto de apoio.
+- [x] Verificar no teste integrado que o clique em `Visão geral` atualiza o hash real para `#visao-geral`.
+- [x] Registrar revisão textual explícita da captura mobile confirmando a legibilidade de `Patrimônio`, descrição e texto de apoio no Sheet aberto.
+- [x] Adicionar teste integrado de `Home` + `DashboardLayout` que clique em `Visão geral` e confirme o hash real sem mockar a atualização.

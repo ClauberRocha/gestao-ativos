@@ -17,8 +17,9 @@ import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
 import { getThemeToggleLabel, getThemeToggleTitle } from "@/lib/theme";
-import { Archive, BarChart3, ChevronRight, LogIn, LogOut, Moon, PanelLeft, Settings2, Sun } from "lucide-react";
-import { CSSProperties, useEffect, useRef, useState } from "react";
+import { canCreateUsers } from "@/lib/user-permissions";
+import { Archive, BarChart3, ChevronRight, LogIn, LogOut, Moon, PanelLeft, Settings2, Sun, UserRound } from "lucide-react";
+import React, { CSSProperties, useEffect, useRef, useState } from "react";
 
 const menuItems = [
   { icon: Archive, label: "Inventário", active: true },
@@ -33,9 +34,17 @@ const MAX_WIDTH = 360;
 export default function DashboardLayout({
   children,
   onOpenAuth,
+  onOpenUserCreate,
+  isAdmin,
+  onOverviewClick,
+  onInventoryClick,
 }: {
   children: React.ReactNode;
   onOpenAuth: () => void;
+  onOpenUserCreate: () => void;
+  isAdmin?: boolean;
+  onOverviewClick: () => void;
+  onInventoryClick: () => void;
 }) {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
@@ -53,6 +62,10 @@ export default function DashboardLayout({
         setSidebarWidth={setSidebarWidth}
         user={user}
         onOpenAuth={onOpenAuth}
+        onOpenUserCreate={onOpenUserCreate}
+        isAdmin={isAdmin}
+        onOverviewClick={onOverviewClick}
+        onInventoryClick={onInventoryClick}
         onSignOut={signOut}
       >
         {children}
@@ -66,13 +79,18 @@ type LayoutContentProps = {
   setSidebarWidth: (width: number) => void;
   user: ReturnType<typeof useSupabaseAuth>["user"];
   onOpenAuth: () => void;
+  onOpenUserCreate: () => void;
+  isAdmin?: boolean;
+  onOverviewClick: () => void;
+  onInventoryClick: () => void;
   onSignOut: () => Promise<void>;
 };
 
-function DashboardLayoutContent({ children, setSidebarWidth, user, onOpenAuth, onSignOut }: LayoutContentProps) {
+function DashboardLayoutContent({ children, setSidebarWidth, user, onOpenAuth, onOpenUserCreate, isAdmin, onOverviewClick, onInventoryClick, onSignOut }: LayoutContentProps) {
   const { state, toggleSidebar } = useSidebar();
   const { theme, toggleTheme } = useTheme();
   const isCollapsed = state === "collapsed";
+  const [activeMenu, setActiveMenu] = useState(() => window.location.hash === "#visao-geral" ? "Visão geral" : "Inventário");
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
@@ -133,18 +151,21 @@ function DashboardLayoutContent({ children, setSidebarWidth, user, onOpenAuth, o
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.label}>
                   <SidebarMenuButton
-                    isActive={item.active}
+                    isActive={activeMenu === item.label}
                     tooltip={item.label}
-                    className={cn("h-10 rounded-xl px-3 text-sm", item.active && "font-semibold")}
-                    onClick={() => undefined}
+                    data-testid={item.label === "Visão geral" ? "overview-button" : "inventory-button"}
+                    data-active={activeMenu === item.label ? "true" : "false"}
+                    className={cn("h-10 rounded-xl px-3 text-sm", activeMenu === item.label && "font-semibold")}
+                    onClick={() => { setActiveMenu(item.label); if (item.label === "Visão geral") onOverviewClick(); else onInventoryClick(); }}
                   >
                     <item.icon className="size-4" />
                     <span>{item.label}</span>
-                    {item.active && !isCollapsed && <ChevronRight className="ml-auto size-3.5 opacity-50" />}
+                    {activeMenu === item.label && !isCollapsed && <ChevronRight className="ml-auto size-3.5 opacity-50" />}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
+            {canCreateUsers(Boolean(user), isAdmin ? "admin" : "operador") && <div className="mt-3 px-1"><Button data-testid="create-user-button" onClick={onOpenUserCreate} variant="outline" size={isCollapsed ? "icon" : "sm"} title="Criar usuário" className="w-full border-sidebar-border bg-transparent text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"><UserRound className="size-3.5" />{!isCollapsed && <span className="ml-2">Criar usuário</span>}</Button></div>}
             {!isCollapsed && (
               <div className="mt-8 rounded-2xl border border-sidebar-border bg-sidebar-accent/50 p-3">
                 <div className="flex items-center gap-2 text-sidebar-foreground/65">
@@ -196,6 +217,7 @@ function DashboardLayoutContent({ children, setSidebarWidth, user, onOpenAuth, o
             <span className="hidden items-center gap-2 rounded-full border border-border/70 bg-card px-3 py-1.5 text-[11px] font-medium text-muted-foreground sm:flex">
               <span className="size-1.5 rounded-full bg-emerald-500" /> Sistema online
             </span>
+            {canCreateUsers(Boolean(user), isAdmin ? "admin" : "operador") && <Button type="button" data-testid="create-user-header-button" onClick={onOpenUserCreate} variant="outline" size="sm" className="h-9 rounded-xl bg-card px-2.5 text-xs sm:px-3"><UserRound className="mr-1.5 size-3.5" /><span className="hidden sm:inline">Criar usuário</span></Button>}
             {toggleTheme && <Button type="button" variant="outline" size="icon" onClick={toggleTheme} aria-label={getThemeToggleLabel(theme)} title={getThemeToggleTitle(theme)} className="size-9 rounded-xl bg-card">{theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}</Button>}
             {!user && <Button onClick={onOpenAuth} size="sm" className="h-9 rounded-xl px-3 text-xs shadow-sm"><LogIn className="mr-1.5 size-3.5" /> Entrar</Button>}
           </div>
