@@ -17,4 +17,4 @@
 - [x] Endurecer funções Supabase com `search_path` fixo e remover exposição pública de funções `SECURITY DEFINER`.
 - [x] Reexecutar advisor de segurança após o endurecimento e documentar alertas externos restantes.
 - [x] Confirmar via banco que `email_confirmed_at` foi preenchido após a confirmação do e-mail.
-- [ ] Validar no app uma leitura autenticada e uma ação protegida com a sessão admin, como salvar uma alteração operacional em um ativo.
+- [x] Validar no app uma leitura autenticada e uma ação protegida com a sessão admin, como salvar uma alteração operacional em um ativo.
