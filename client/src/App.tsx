@@ -6,6 +6,8 @@ import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
+import AuditPage from "./pages/Audit";
+import OperatorsPage from "./pages/Operators";
 import WelcomeScreen from "./pages/WelcomeScreen";
 import { useSupabaseAuth } from "./hooks/useSupabaseAuth";
 
@@ -43,6 +45,12 @@ function MainApp() {
       </Route>
       <Route path="/inventario">
         <Home onExit={handleExit} />
+      </Route>
+      <Route path="/auditoria">
+        <AuditPage onExit={handleExit} />
+      </Route>
+      <Route path="/operadores">
+        <OperatorsPage onExit={handleExit} />
       </Route>
       <Route path="/">
         {user || hasEntered ? (

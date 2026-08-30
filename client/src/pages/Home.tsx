@@ -7,10 +7,12 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleAlert,
+  ClipboardList,
   Database,
   Download,
   FileSpreadsheet,
   FileText,
+  History,
   LayoutDashboard,
   Loader2,
   LockKeyhole,
@@ -18,6 +20,7 @@ import {
   PackageCheck,
   Plus,
   Printer,
+  RefreshCw,
   Search,
   ShieldCheck,
   SlidersHorizontal,
@@ -28,6 +31,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useLocation } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -38,10 +42,17 @@ import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { ASSET_STATUSES, formatCurrency, sampleAssets, searchAssets } from "@/lib/assets";
-import { isSupabaseConfigured, supabase, type Asset, type AssetStatus, type Profile } from "@/lib/supabase";
+import {
+  calculateAssetDiff,
+  getAssetAudits,
+  recordAssetAudit,
+  FIELD_LABELS,
+} from "@/lib/audit";
+import { isSupabaseConfigured, supabase, type Asset, type AssetStatus, type AuditLog, type Profile } from "@/lib/supabase";
 import { exportAssetsToExcel, exportAssetSheetPDF } from "@/lib/exportUtils";
 
 const PAGE_SIZE = 8;
@@ -198,8 +209,28 @@ function AssetForm({
   onClose: () => void;
   demoMode: boolean;
 }) {
+  const { user } = useSupabaseAuth();
+  const [activeTab, setActiveTab] = useState<"form" | "history">("form");
+  const [assetAudits, setAssetAudits] = useState<AuditLog[]>([]);
+  const [loadingAudits, setLoadingAudits] = useState(false);
+
   const setField = <K extends keyof AssetFormData>(field: K, value: AssetFormData[K]) =>
     setForm({ ...form, [field]: value });
+
+  useEffect(() => {
+    if (asset?.id || asset?.patrimonio) {
+      setLoadingAudits(true);
+      getAssetAudits({
+        assetId: asset.id,
+        patrimonio: asset.patrimonio,
+        user,
+      })
+        .then((res) => setAssetAudits(res))
+        .finally(() => setLoadingAudits(false));
+    } else {
+      setAssetAudits([]);
+    }
+  }, [asset, user]);
 
   const handleExportPDF = () => {
     exportAssetSheetPDF(
@@ -223,8 +254,8 @@ function AssetForm({
   };
 
   return (
-    <SheetContent side="right" className="w-full gap-0 overflow-y-auto border-l border-border/70 p-0 sm:max-w-[520px]">
-      <SheetHeader className="border-b border-border/70 px-6 py-6">
+    <SheetContent side="right" className="w-full gap-0 overflow-y-auto border-l border-border/70 p-0 sm:max-w-[540px]">
+      <SheetHeader className="border-b border-border/70 px-6 py-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="flex size-8 items-center justify-center rounded-xl bg-slate-950 text-white">
@@ -250,124 +281,202 @@ function AssetForm({
         <SheetDescription>
           {isNew
             ? "Cadastre o hardware e deixe a custódia pronta para acompanhamento."
-            : "Revise os dados de identificação, localização e gere a ficha técnica em PDF."}
+            : "Revise os dados de identificação, localização, histórico e gere a ficha técnica em PDF."}
         </SheetDescription>
-      </SheetHeader>
-      <div className="space-y-6 px-6 py-6">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2 space-y-2">
-            <Label htmlFor="patrimonio">Patrimônio</Label>
-            <Input
-              id="patrimonio"
-              value={form.patrimonio}
-              onChange={(event) => setField("patrimonio", event.target.value)}
-              placeholder="MR PAY 0001"
-            />
-          </div>
-          <div className="col-span-2 space-y-2">
-            <Label htmlFor="descricao">Descrição</Label>
-            <Input
-              id="descricao"
-              value={form.descricao}
-              onChange={(event) => setField("descricao", event.target.value)}
-              placeholder="PIN PAD Ingenico Lane/3000"
-            />
-          </div>
-          <div className="col-span-2 space-y-2">
-            <Label htmlFor="numero_serie">Número de série</Label>
-            <Input
-              id="numero_serie"
-              value={form.numero_serie}
-              onChange={(event) => setField("numero_serie", event.target.value)}
-              placeholder="7200032211011635"
-              className="font-mono text-xs"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="status">Status</Label>
-            <Select value={form.status} onValueChange={(value) => setField("status", value as AssetStatus)}>
-              <SelectTrigger id="status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ASSET_STATUSES.map((item) => (
-                  <SelectItem key={item} value={item}>
-                    {item}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="conservacao">Conservação</Label>
-            <Input
-              id="conservacao"
-              value={form.conservacao ?? ""}
-              onChange={(event) => setField("conservacao", event.target.value)}
-              placeholder="Bom"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="conta_cliente">Conta cliente</Label>
-            <Input
-              id="conta_cliente"
-              value={form.conta_cliente ?? ""}
-              onChange={(event) => setField("conta_cliente", event.target.value)}
-              placeholder="SEFAZ"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="local">Local</Label>
-            <Input
-              id="local"
-              value={form.local ?? ""}
-              onChange={(event) => setField("local", event.target.value)}
-              placeholder="São Paulo / SP"
-            />
-          </div>
-          {isAdmin && (
-            <div className="col-span-2 space-y-2">
-              <Label htmlFor="valor_aquisicao">
-                Valor de aquisição <span className="text-[10px] font-normal text-muted-foreground">(somente admin)</span>
-              </Label>
-              <Input
-                id="valor_aquisicao"
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.valor_aquisicao ?? ""}
-                onChange={(event) =>
-                  setField("valor_aquisicao", event.target.value === "" ? null : Number(event.target.value))
-                }
-                placeholder="0,00"
-              />
-            </div>
-          )}
-          <div className="col-span-2 space-y-2">
-            <Label htmlFor="observacoes">Observações</Label>
-            <textarea
-              id="observacoes"
-              value={form.observacoes ?? ""}
-              onChange={(event) => setField("observacoes", event.target.value)}
-              placeholder="Notas de conferência, RMA ou transferência..."
-              className="flex min-h-28 w-full resize-y rounded-xl border border-input bg-transparent px-3 py-2 text-sm shadow-sm outline-none transition placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
-            />
-          </div>
-        </div>
-        {demoMode && (
-          <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
-            <CircleAlert className="mt-0.5 size-4 shrink-0" />
-            <p>Os dados exibidos são de demonstração. Execute a migration no Supabase para habilitar gravações reais.</p>
+
+        {!isNew && (
+          <div className="pt-2">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 rounded-xl bg-muted/60 p-1">
+                <TabsTrigger value="form" className="rounded-lg text-xs font-semibold">
+                  Dados Cadastrais
+                </TabsTrigger>
+                <TabsTrigger value="history" className="rounded-lg text-xs font-semibold gap-1.5">
+                  <History className="size-3.5" />
+                  Histórico ({assetAudits.length})
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
         )}
-        <Separator />
-        <div className="flex items-start gap-3 text-xs leading-5 text-muted-foreground">
-          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
-          <p>
-            Operadores podem editar dados operacionais e gerar a ficha técnica em PDF. O valor de aquisição permanece restrito aos administradores.
-          </p>
+      </SheetHeader>
+
+      {activeTab === "form" ? (
+        <div className="space-y-6 px-6 py-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2 space-y-2">
+              <Label htmlFor="patrimonio">Patrimônio</Label>
+              <Input
+                id="patrimonio"
+                value={form.patrimonio}
+                onChange={(event) => setField("patrimonio", event.target.value)}
+                placeholder="MR PAY 0001"
+              />
+            </div>
+            <div className="col-span-2 space-y-2">
+              <Label htmlFor="descricao">Descrição</Label>
+              <Input
+                id="descricao"
+                value={form.descricao}
+                onChange={(event) => setField("descricao", event.target.value)}
+                placeholder="PIN PAD Ingenico Lane/3000"
+              />
+            </div>
+            <div className="col-span-2 space-y-2">
+              <Label htmlFor="numero_serie">Número de série</Label>
+              <Input
+                id="numero_serie"
+                value={form.numero_serie}
+                onChange={(event) => setField("numero_serie", event.target.value)}
+                placeholder="7200032211011635"
+                className="font-mono text-xs"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select value={form.status} onValueChange={(value) => setField("status", value as AssetStatus)}>
+                <SelectTrigger id="status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ASSET_STATUSES.map((item) => (
+                    <SelectItem key={item} value={item}>
+                      {item}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="conservacao">Conservação</Label>
+              <Input
+                id="conservacao"
+                value={form.conservacao ?? ""}
+                onChange={(event) => setField("conservacao", event.target.value)}
+                placeholder="Bom"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="conta_cliente">Conta cliente</Label>
+              <Input
+                id="conta_cliente"
+                value={form.conta_cliente ?? ""}
+                onChange={(event) => setField("conta_cliente", event.target.value)}
+                placeholder="SEFAZ"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="local">Local</Label>
+              <Input
+                id="local"
+                value={form.local ?? ""}
+                onChange={(event) => setField("local", event.target.value)}
+                placeholder="São Paulo / SP"
+              />
+            </div>
+            {isAdmin && (
+              <div className="col-span-2 space-y-2">
+                <Label htmlFor="valor_aquisicao">
+                  Valor de aquisição <span className="text-[10px] font-normal text-muted-foreground">(somente admin)</span>
+                </Label>
+                <Input
+                  id="valor_aquisicao"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.valor_aquisicao ?? ""}
+                  onChange={(event) =>
+                    setField("valor_aquisicao", event.target.value === "" ? null : Number(event.target.value))
+                  }
+                  placeholder="0,00"
+                />
+              </div>
+            )}
+            <div className="col-span-2 space-y-2">
+              <Label htmlFor="observacoes">Observações</Label>
+              <textarea
+                id="observacoes"
+                value={form.observacoes ?? ""}
+                onChange={(event) => setField("observacoes", event.target.value)}
+                placeholder="Notas de conferência, RMA ou transferência..."
+                className="flex min-h-28 w-full resize-y rounded-xl border border-input bg-transparent px-3 py-2 text-sm shadow-sm outline-none transition placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
+          </div>
+          {demoMode && (
+            <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+              <CircleAlert className="mt-0.5 size-4 shrink-0" />
+              <p>Os dados exibidos são de demonstração. Execute a migration no Supabase para habilitar gravações reais.</p>
+            </div>
+          )}
+          <Separator />
+          <div className="flex items-start gap-3 text-xs leading-5 text-muted-foreground">
+            <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+            <p>
+              Operadores podem editar dados operacionais e gerar a ficha técnica em PDF. O valor de aquisição permanece restrito aos administradores.
+            </p>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="space-y-4 px-6 py-6">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-foreground">Linha do Tempo de Custódia</p>
+            <span className="text-[11px] text-muted-foreground">{assetAudits.length} registros</span>
+          </div>
+
+          {loadingAudits ? (
+            <p className="text-center text-xs text-muted-foreground py-8">Carregando histórico...</p>
+          ) : assetAudits.length === 0 ? (
+            <div className="rounded-2xl border border-border/70 bg-muted/20 p-6 text-center">
+              <History className="mx-auto size-6 text-muted-foreground/50" />
+              <p className="mt-2 text-xs font-semibold">Nenhum evento registrado ainda</p>
+              <p className="text-[11px] text-muted-foreground">As alterações salvas aparecerão nesta linha do tempo.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {assetAudits.map((item) => {
+                const dateStr = new Date(item.created_at).toLocaleString("pt-BR", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                });
+                const changes = Object.entries(item.changes || {});
+
+                return (
+                  <div key={item.id} className="rounded-xl border border-border/70 bg-card p-3 shadow-sm text-xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 font-semibold text-foreground">
+                        <span className="size-2 rounded-full bg-primary" />
+                        {item.action === "CREATE" ? "Cadastrado" : item.action === "DELETE" ? "Excluído" : "Modificado"} por{" "}
+                        <span className="text-primary">{item.user_name || "Operador"}</span>
+                      </div>
+                      <span className="font-mono text-[10px] text-muted-foreground">{dateStr}</span>
+                    </div>
+
+                    {item.notes && <p className="mt-1.5 text-[11px] text-muted-foreground italic">"{item.notes}"</p>}
+
+                    {changes.length > 0 && (
+                      <div className="mt-2.5 space-y-1 border-t border-border/50 pt-2">
+                        {changes.map(([k, c]) => (
+                          <div key={k} className="flex items-center justify-between text-[11px]">
+                            <span className="text-muted-foreground">{FIELD_LABELS[k] || k}:</span>
+                            <span className="font-medium text-foreground">
+                              {c.old ? `${c.old} ➔ ` : ""}
+                              <span className="font-semibold text-primary">{c.new || "—"}</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
       <SheetFooter className="border-t border-border/70 bg-muted/20 px-6 py-4">
         <div className="flex w-full items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -659,7 +768,7 @@ export default function Home({ onExit }: { onExit?: () => void }) {
   };
 
   const saveAsset = async () => {
-    if (!user || usingDemoData) return;
+    if (!user && !usingDemoData) return;
     setSaving(true);
     try {
       const payload = {
@@ -670,12 +779,40 @@ export default function Home({ onExit }: { onExit?: () => void }) {
         observacoes: form.observacoes || null,
         valor_aquisicao: isAdmin ? form.valor_aquisicao : undefined,
       };
-      const result = editingAsset
-        ? await supabase.from("assets").update(payload).eq("id", editingAsset.id)
-        : await supabase.from("assets").insert(payload);
-      if (result.error) throw result.error;
+
+      if (!usingDemoData && user) {
+        const result = editingAsset
+          ? await supabase.from("assets").update(payload).eq("id", editingAsset.id)
+          : await supabase.from("assets").insert(payload);
+        if (result.error) throw result.error;
+      }
+
+      // Record audit log
+      if (editingAsset) {
+        const diff = calculateAssetDiff(editingAsset, form);
+        await recordAssetAudit({
+          assetId: editingAsset.id,
+          patrimonio: form.patrimonio,
+          action: "UPDATE",
+          user,
+          profile,
+          changes: diff,
+          notes: form.observacoes || "Atualização de dados cadastrais",
+        });
+      } else {
+        const diff = calculateAssetDiff(null, form);
+        await recordAssetAudit({
+          patrimonio: form.patrimonio,
+          action: "CREATE",
+          user,
+          profile,
+          changes: diff,
+          notes: form.observacoes || "Cadastro inicial do ativo",
+        });
+      }
+
       toast.success(editingAsset ? "Ativo atualizado" : "Ativo cadastrado", {
-        description: `${form.patrimonio} foi salvo no inventário.`,
+        description: `${form.patrimonio} foi salvo no inventário e registrado na auditoria.`,
       });
       setSheetOpen(false);
       await loadAssets();
@@ -689,17 +826,33 @@ export default function Home({ onExit }: { onExit?: () => void }) {
   };
 
   const deleteAsset = async () => {
-    if (!editingAsset || !isAdmin || usingDemoData) return;
+    if (!editingAsset || !isAdmin) return;
     if (!window.confirm(`Excluir o ativo ${editingAsset.patrimonio}?`)) return;
-    const { error } = await supabase.from("assets").delete().eq("id", editingAsset.id);
-    if (error) {
-      toast.error("Exclusão não permitida", { description: error.message });
-      return;
+
+    if (!usingDemoData && user) {
+      const { error } = await supabase.from("assets").delete().eq("id", editingAsset.id);
+      if (error) {
+        toast.error("Exclusão não permitida", { description: error.message });
+        return;
+      }
     }
-    toast.success("Ativo excluído");
+
+    await recordAssetAudit({
+      assetId: editingAsset.id,
+      patrimonio: editingAsset.patrimonio,
+      action: "DELETE",
+      user,
+      profile,
+      changes: { status: { old: editingAsset.status, new: "Excluído" } },
+      notes: "Exclusão definitiva de ativo pelo administrador",
+    });
+
+    toast.success("Ativo excluído e registrado na trilha de auditoria");
     setSheetOpen(false);
     await loadAssets();
   };
+
+  const [, setLocation] = useLocation();
 
   return (
     <DashboardLayout onOpenAuth={() => setAuthOpen(true)} onExit={onExit}>
@@ -754,9 +907,22 @@ export default function Home({ onExit }: { onExit?: () => void }) {
             <p className="mt-1 text-sm text-muted-foreground">Consulte patrimônio ou número de série em uma única busca e exporte relatórios.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
-              <Database className="size-3.5" /> {usingDemoData ? "Demonstração" : "Supabase"}
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setLocation("/auditoria")}
+              className="h-9 gap-1.5 rounded-xl border-border/80 text-xs font-semibold text-foreground hover:bg-muted"
+            >
+              <History className="size-3.5 text-indigo-600" /> Auditoria
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setLocation("/operadores")}
+              className="h-9 gap-1.5 rounded-xl border-border/80 text-xs font-semibold text-foreground hover:bg-muted"
+            >
+              <Users className="size-3.5 text-sky-600" /> Operadores
+            </Button>
             <Button
               onClick={handleExportExcel}
               disabled={exportingExcel || total === 0}
