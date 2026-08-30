@@ -8,9 +8,11 @@ create extension if not exists pg_trgm with schema extensions;
 create schema if not exists private;
 revoke all on schema private from public;
 
+-- Tabela de Perfis de Usuários (Operadores e Admins)
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   full_name text,
+  email text,
   role text not null default 'operador' check (role in ('admin', 'operador')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -22,9 +24,15 @@ language plpgsql
 security definer set search_path = public, auth
 as $$
 begin
-  insert into public.profiles (id, full_name)
-  values (new.id, coalesce(new.raw_user_meta_data ->> 'full_name', split_part(new.email, '@', 1)))
-  on conflict (id) do nothing;
+  insert into public.profiles (id, full_name, email)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data ->> 'full_name', split_part(new.email, '@', 1)),
+    new.email
+  )
+  on conflict (id) do update set
+    email = excluded.email,
+    full_name = coalesce(public.profiles.full_name, excluded.full_name);
   return new;
 end;
 $$;
@@ -35,6 +43,7 @@ create trigger on_auth_user_created
 after insert on auth.users
 for each row execute procedure private.handle_new_user();
 
+-- Tabela de Ativos
 create table if not exists public.assets (
   id uuid primary key default gen_random_uuid(),
   patrimonio text not null unique,
@@ -76,6 +85,26 @@ create trigger assets_set_updated_at
 before update on public.assets
 for each row execute procedure public.set_updated_at();
 
+-- Tabela de Auditoria de Alterações
+create table if not exists public.asset_audits (
+  id uuid primary key default gen_random_uuid(),
+  asset_id uuid references public.assets(id) on delete set null,
+  patrimonio text not null,
+  action text not null check (action in ('CREATE', 'UPDATE', 'DELETE')),
+  user_id uuid references auth.users(id) on delete set null,
+  user_name text,
+  user_email text,
+  changes jsonb,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists asset_audits_patrimonio_idx on public.asset_audits (patrimonio);
+create index if not exists asset_audits_asset_id_idx on public.asset_audits (asset_id);
+create index if not exists asset_audits_user_id_idx on public.asset_audits (user_id);
+create index if not exists asset_audits_created_at_idx on public.asset_audits (created_at desc);
+
+-- Função auxiliar is_admin
 create or replace function private.is_admin()
 returns boolean
 language sql
@@ -92,15 +121,121 @@ revoke all on function private.is_admin() from public;
 grant usage on schema private to authenticated;
 grant execute on function private.is_admin() to authenticated;
 
+-- Trigger automático de Auditoria no Postgres
+create or replace function private.record_asset_audit()
+returns trigger
+language plpgsql
+security definer set search_path = public, auth
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_user_name text;
+  v_user_email text;
+  v_diff jsonb := '{}'::jsonb;
+begin
+  if v_user_id is not null then
+    select full_name, email into v_user_name, v_user_email from public.profiles where id = v_user_id;
+  end if;
+
+  if (TG_OP = 'INSERT') then
+    insert into public.asset_audits (asset_id, patrimonio, action, user_id, user_name, user_email, changes, notes)
+    values (
+      NEW.id,
+      NEW.patrimonio,
+      'CREATE',
+      v_user_id,
+      coalesce(v_user_name, 'Operador'),
+      v_user_email,
+      jsonb_build_object(
+        'status', jsonb_build_object('old', null, 'new', NEW.status),
+        'local', jsonb_build_object('old', null, 'new', NEW.local),
+        'conta_cliente', jsonb_build_object('old', null, 'new', NEW.conta_cliente),
+        'descricao', jsonb_build_object('old', null, 'new', NEW.descricao)
+      ),
+      'Cadastro inicial do ativo'
+    );
+    return NEW;
+  elsif (TG_OP = 'UPDATE') then
+    if (OLD.status is distinct from NEW.status) then
+      v_diff := v_diff || jsonb_build_object('status', jsonb_build_object('old', OLD.status, 'new', NEW.status));
+    end if;
+    if (OLD.local is distinct from NEW.local) then
+      v_diff := v_diff || jsonb_build_object('local', jsonb_build_object('old', OLD.local, 'new', NEW.local));
+    end if;
+    if (OLD.conta_cliente is distinct from NEW.conta_cliente) then
+      v_diff := v_diff || jsonb_build_object('conta_cliente', jsonb_build_object('old', OLD.conta_cliente, 'new', NEW.conta_cliente));
+    end if;
+    if (OLD.conservacao is distinct from NEW.conservacao) then
+      v_diff := v_diff || jsonb_build_object('conservacao', jsonb_build_object('old', OLD.conservacao, 'new', NEW.conservacao));
+    end if;
+    if (OLD.descricao is distinct from NEW.descricao) then
+      v_diff := v_diff || jsonb_build_object('descricao', jsonb_build_object('old', OLD.descricao, 'new', NEW.descricao));
+    end if;
+    if (OLD.numero_serie is distinct from NEW.numero_serie) then
+      v_diff := v_diff || jsonb_build_object('numero_serie', jsonb_build_object('old', OLD.numero_serie, 'new', NEW.numero_serie));
+    end if;
+    if (OLD.observacoes is distinct from NEW.observacoes) then
+      v_diff := v_diff || jsonb_build_object('observacoes', jsonb_build_object('old', OLD.observacoes, 'new', NEW.observacoes));
+    end if;
+
+    if (v_diff != '{}'::jsonb) then
+      insert into public.asset_audits (asset_id, patrimonio, action, user_id, user_name, user_email, changes, notes)
+      values (
+        NEW.id,
+        NEW.patrimonio,
+        'UPDATE',
+        v_user_id,
+        coalesce(v_user_name, 'Operador'),
+        v_user_email,
+        v_diff,
+        'Atualização cadastral do ativo'
+      );
+    end if;
+    return NEW;
+  elsif (TG_OP = 'DELETE') then
+    insert into public.asset_audits (asset_id, patrimonio, action, user_id, user_name, user_email, changes, notes)
+    values (
+      OLD.id,
+      OLD.patrimonio,
+      'DELETE',
+      v_user_id,
+      coalesce(v_user_name, 'Administrador'),
+      v_user_email,
+      jsonb_build_object('status', jsonb_build_object('old', OLD.status, 'new', 'Excluído')),
+      'Exclusão de ativo pelo administrador'
+    );
+    return OLD;
+  end if;
+  return null;
+end;
+$$;
+
+revoke all on function private.record_asset_audit() from public;
+drop trigger if exists assets_audit_trigger on public.assets;
+create trigger assets_audit_trigger
+after insert or update or delete on public.assets
+for each row execute procedure private.record_asset_audit();
+
+-- Row Level Security (RLS)
 alter table public.profiles enable row level security;
 alter table public.assets enable row level security;
+alter table public.asset_audits enable row level security;
 
-drop policy if exists "Users can read their own profile" on public.profiles;
-create policy "Users can read their own profile"
+-- Policies para Profiles
+drop policy if exists "Users can read profiles" on public.profiles;
+create policy "Users can read profiles"
 on public.profiles for select
 to authenticated
-using (id = auth.uid());
+using (id = auth.uid() or private.is_admin());
 
+drop policy if exists "Users can update own profile name" on public.profiles;
+create policy "Users can update own profile name"
+on public.profiles for update
+to authenticated
+using (id = auth.uid() or private.is_admin())
+with check (id = auth.uid() or private.is_admin());
+
+-- Policies para Assets
 drop policy if exists "Authenticated users can read assets" on public.assets;
 create policy "Authenticated users can read assets"
 on public.assets for select
@@ -126,7 +261,20 @@ on public.assets for delete
 to authenticated
 using (private.is_admin());
 
--- A view segura evita expor valor_aquisicao para operadores.
+-- Policies para Asset Audits
+drop policy if exists "Authenticated users can read asset_audits" on public.asset_audits;
+create policy "Authenticated users can read asset_audits"
+on public.asset_audits for select
+to authenticated
+using (auth.uid() is not null);
+
+drop policy if exists "Authenticated users can insert asset_audits" on public.asset_audits;
+create policy "Authenticated users can insert asset_audits"
+on public.asset_audits for insert
+to authenticated
+with check (auth.uid() is not null);
+
+-- View Segura
 drop view if exists public.assets_inventory;
 create view public.assets_inventory
 with (security_invoker = true)
@@ -146,11 +294,14 @@ select
   updated_at
 from public.assets;
 
--- Nunca exponha a tabela bruta via PostgREST: ela contém valor_aquisicao.
+-- Permissões
 revoke select on public.assets from anon, authenticated;
 grant insert, update, delete on public.assets to authenticated;
 grant select on public.assets_inventory to authenticated;
+grant select, insert on public.asset_audits to authenticated;
+grant select, update on public.profiles to authenticated;
 
+-- Dados Iniciais de Ativos
 insert into public.assets (patrimonio, descricao, numero_serie, conta_cliente, local, status, conservacao, valor_aquisicao, observacoes)
 values
   ('MR PAY 0001', 'PIN PAD Ingenico Lane/3000', '7200032211011635', 'SEFAZ', 'São Paulo / SP', 'Ativo', 'Bom', 389.90, 'Alocado no guichê 04; última conferência sem ressalvas.'),
@@ -166,6 +317,3 @@ values
   ('TOTEM 0003', 'Totem de autoatendimento 24 pol.', 'TOT-2023-00003', 'Poupatempo', 'São José dos Campos / SP', 'Ativo', 'Regular', 6420.00, 'Em operação com pequeno desgaste no gabinete.'),
   ('DESK 0164', 'Desktop Dell OptiPlex 7020', '9QZ6ML2', 'Receita Federal', 'Curitiba / PR', 'Em estoque', 'Novo', 3550.00, 'Kit completo separado para expedição.')
 on conflict (patrimonio) do nothing;
-
--- Para o primeiro usuário, crie a conta pelo Auth do Supabase e promova manualmente a admin se necessário:
--- update public.profiles set role = 'admin' where id = '<uuid-do-usuario>';

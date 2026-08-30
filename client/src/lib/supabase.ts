@@ -37,5 +37,28 @@ export type Asset = {
 export type Profile = {
   id: string;
   full_name: string | null;
+  email?: string | null;
   role: "admin" | "operador";
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type AuditAction = "CREATE" | "UPDATE" | "DELETE";
+
+export type FieldChange = {
+  old: string | number | null | undefined;
+  new: string | number | null | undefined;
+};
+
+export type AuditLog = {
+  id: string;
+  asset_id?: string | null;
+  patrimonio: string;
+  action: AuditAction;
+  user_id?: string | null;
+  user_name?: string | null;
+  user_email?: string | null;
+  changes?: Record<string, FieldChange> | null;
+  notes?: string | null;
+  created_at: string;
 };
