@@ -18,3 +18,7 @@
 - [x] Reexecutar advisor de segurança após o endurecimento e documentar alertas externos restantes.
 - [x] Confirmar via banco que `email_confirmed_at` foi preenchido após a confirmação do e-mail.
 - [x] Validar no app uma leitura autenticada e uma ação protegida com a sessão admin, como salvar uma alteração operacional em um ativo.
+- [x] Revisar package.json e remover dependência espúria `add`.
+- [x] Implementar auditoria completa de alterações por usuário com triggers Postgres, RLS, tela global e linha do tempo por ativo.
+- [x] Criar tela administrativa para gestão de operadores com governança de perfis (admin/operador) e permissões.
+- [ ] Conectar o projeto Mr Pay Ativos ao repositório GitHub existente `gestao-ativos` e validar a sincronização.
