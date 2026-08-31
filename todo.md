@@ -23,5 +23,5 @@
 - [x] Criar tela administrativa para gestão de operadores com governança de perfis (admin/operador) e permissões.
 - [x] Conectar o projeto Mr Pay Ativos ao repositório GitHub existente `gestao-ativos` e validar a sincronização.
 - [x] Corrigir a divergência entre `package.json` e `pnpm-lock.yaml` e validar uma implantação bem-sucedida.
-- [ ] Executar uma nova publicação/implantação após sincronizar `pnpm-lock.yaml` com `package.json` e confirmar status de deploy bem-sucedido.
-- [ ] Enviar o lockfile atualizado ao repositório remoto e revalidar o pipeline com `frozen-lockfile`.
+- [x] Executar uma nova publicação/implantação após sincronizar `pnpm-lock.yaml` com `package.json` e confirmar status de deploy bem-sucedido.
+- [x] Enviar o lockfile atualizado ao repositório remoto e revalidar o pipeline com `frozen-lockfile`.
