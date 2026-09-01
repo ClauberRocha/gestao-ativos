@@ -12,6 +12,7 @@ import {
   Download,
   FileSpreadsheet,
   FileText,
+  FileUp,
   History,
   LayoutDashboard,
   Loader2,
@@ -26,6 +27,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Trash2,
+  Upload,
   UserRound,
   Users,
   X,
@@ -44,8 +46,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DashboardLayout from "@/components/DashboardLayout";
+import ImportExcelDialog from "@/components/ImportExcelDialog";
+import ClearDatabaseDialog from "@/components/ClearDatabaseDialog";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
-import { ASSET_STATUSES, formatCurrency, sampleAssets, searchAssets } from "@/lib/assets";
+import { ASSET_STATUSES, formatCurrency, getLocalAssets, sampleAssets, searchAssets } from "@/lib/assets";
 import {
   calculateAssetDiff,
   getAssetAudits,
@@ -596,6 +600,8 @@ export default function Home({ onExit }: { onExit?: () => void }) {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [usingDemoData, setUsingDemoData] = useState(true);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
@@ -622,14 +628,15 @@ export default function Home({ onExit }: { onExit?: () => void }) {
     setLoading(true);
     setConnectionError(null);
     if (!user || !isSupabaseConfigured) {
-      const filtered = searchAssets(sampleAssets, query, status);
+      const local = getLocalAssets();
+      const filtered = searchAssets(local, query, status);
       setTotal(filtered.length);
       setAssets(filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE));
       setMetrics({
-        total: sampleAssets.length,
-        stock: sampleAssets.filter((asset) => asset.status === "Em estoque").length,
-        clients: sampleAssets.filter((asset) => asset.status === "Ativo" || asset.status === "Entregue").length,
-        defects: sampleAssets.filter((asset) => asset.status === "Defeito").length,
+        total: local.length,
+        stock: local.filter((asset) => asset.status === "Em estoque").length,
+        clients: local.filter((asset) => asset.status === "Ativo" || asset.status === "Entregue").length,
+        defects: local.filter((asset) => asset.status === "Defeito").length,
       });
       setUsingDemoData(true);
       setLoading(false);
@@ -660,9 +667,16 @@ export default function Home({ onExit }: { onExit?: () => void }) {
       });
       setUsingDemoData(false);
     } catch (error) {
-      const filtered = searchAssets(sampleAssets, query, status);
+      const local = getLocalAssets();
+      const filtered = searchAssets(local, query, status);
       setTotal(filtered.length);
       setAssets(filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE));
+      setMetrics({
+        total: local.length,
+        stock: local.filter((asset) => asset.status === "Em estoque").length,
+        clients: local.filter((asset) => asset.status === "Ativo" || asset.status === "Entregue").length,
+        defects: local.filter((asset) => asset.status === "Defeito").length,
+      });
       setUsingDemoData(true);
       setConnectionError(error instanceof Error ? error.message : "A tabela ainda não está disponível.");
     } finally {
@@ -951,6 +965,24 @@ export default function Home({ onExit }: { onExit?: () => void }) {
               )}
               Exportar Excel
             </Button>
+            <Button
+              onClick={() => setImportDialogOpen(true)}
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-xl border-indigo-300/80 bg-indigo-50/60 px-3 text-xs font-semibold text-indigo-800 shadow-sm transition hover:bg-indigo-100 hover:text-indigo-900"
+            >
+              <FileUp className="mr-1.5 size-3.5 text-indigo-700" />
+              Importar Base Excel
+            </Button>
+            <Button
+              onClick={() => setClearDialogOpen(true)}
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-xl border-red-200/80 bg-red-50/50 px-3 text-xs font-semibold text-red-700 shadow-sm transition hover:bg-red-100 hover:text-red-800"
+            >
+              <Trash2 className="mr-1.5 size-3.5 text-red-600" />
+              Limpar Base Atual
+            </Button>
             <Button onClick={openNewAsset} size="sm" className="h-9 rounded-xl px-3 text-xs shadow-sm">
               <Plus className="mr-1.5 size-3.5" /> Novo ativo
             </Button>
@@ -1170,6 +1202,19 @@ export default function Home({ onExit }: { onExit?: () => void }) {
         />
       </Sheet>
       <AuthDialog open={authOpen} onOpenChange={setAuthOpen} />
+      <ImportExcelDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        profile={profile}
+        onSuccess={() => void loadAssets()}
+      />
+      <ClearDatabaseDialog
+        open={clearDialogOpen}
+        onOpenChange={setClearDialogOpen}
+        totalRecords={metrics.total}
+        profile={profile}
+        onSuccess={() => void loadAssets()}
+      />
       {authLoading && (
         <div className="pointer-events-none fixed bottom-4 right-4 rounded-full border border-border/70 bg-card/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-lg">
           Verificando sessão...

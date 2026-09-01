@@ -149,6 +149,36 @@ export const sampleAssets: Asset[] = [
   },
 ];
 
+export const ASSETS_STORAGE_KEY = "mrpay_assets_store";
+
+export function getLocalAssets(): Asset[] {
+  try {
+    const saved = localStorage.getItem(ASSETS_STORAGE_KEY);
+    if (saved !== null) {
+      return JSON.parse(saved) as Asset[];
+    }
+  } catch (e) {
+    console.warn("Could not read local assets", e);
+  }
+  return sampleAssets;
+}
+
+export function saveLocalAssets(assets: Asset[]): void {
+  try {
+    localStorage.setItem(ASSETS_STORAGE_KEY, JSON.stringify(assets));
+  } catch (e) {
+    console.warn("Could not save local assets", e);
+  }
+}
+
+export function clearLocalAssets(): void {
+  try {
+    localStorage.setItem(ASSETS_STORAGE_KEY, JSON.stringify([]));
+  } catch (e) {
+    console.warn("Could not clear local assets", e);
+  }
+}
+
 export function searchAssets(assets: Asset[], query: string, status?: AssetStatus | "Todos") {
   const normalizedQuery = query.trim().toLocaleLowerCase("pt-BR");
   return assets.filter((asset) => {
@@ -163,3 +193,4 @@ export function formatCurrency(value: number | null | undefined) {
   if (value === null || value === undefined) return "—";
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }
+
