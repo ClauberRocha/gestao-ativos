@@ -852,12 +852,26 @@ export default function Home({ onExit }: { onExit?: () => void }) {
     await loadAssets();
   };
 
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (location === "/inventario") {
+      const el = document.getElementById("inventario-section");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    } else if (location === "/visao-geral" || location === "/") {
+      const el = document.getElementById("visao-geral-section");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+  }, [location]);
 
   return (
     <DashboardLayout onOpenAuth={() => setAuthOpen(true)} onExit={onExit}>
       <div className="mx-auto max-w-[1480px] space-y-6">
-        <section className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-slate-950 px-6 py-7 text-white shadow-[0_18px_55px_-28px_rgba(15,23,42,0.6)] sm:px-8 sm:py-8">
+        <section id="visao-geral-section" className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-slate-950 px-6 py-7 text-white shadow-[0_18px_55px_-28px_rgba(15,23,42,0.6)] sm:px-8 sm:py-8">
           <div className="absolute -right-20 -top-28 size-80 rounded-full bg-indigo-500/20 blur-3xl" />
           <div className="absolute bottom-[-120px] left-[38%] size-72 rounded-full bg-cyan-400/10 blur-3xl" />
           <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,0.10)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.10)_1px,transparent_1px)] [background-size:38px_38px]" />
@@ -896,7 +910,7 @@ export default function Home({ onExit }: { onExit?: () => void }) {
           <KpiCard label="Com defeito" value={metrics.defects} detail="Aguardando tratativa" icon={CircleAlert} tone="bg-red-50 text-red-700" />
         </section>
 
-        <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <section id="inventario-section" className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between scroll-mt-24">
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-semibold tracking-tight">Inventário</h2>

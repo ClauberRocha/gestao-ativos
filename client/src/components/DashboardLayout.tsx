@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { cn } from "@/lib/utils";
 import { isSupabaseConfigured, supabase, type Profile } from "@/lib/supabase";
-import { Archive, ChevronRight, History, LogIn, LogOut, PanelLeft, Settings2, ShieldCheck, Users } from "lucide-react";
+import { Archive, ChevronRight, History, LayoutDashboard, LogIn, LogOut, PanelLeft, Settings2, ShieldCheck, Users } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 
@@ -137,10 +137,16 @@ function DashboardLayoutContent({
 
   const navItems = [
     {
+      icon: LayoutDashboard,
+      label: "Visão Geral",
+      path: "/visao-geral",
+      active: location === "/" || location === "/visao-geral",
+    },
+    {
       icon: Archive,
       label: "Inventário",
       path: "/inventario",
-      active: location === "/" || location === "/inventario",
+      active: location === "/inventario",
     },
     {
       icon: History,
@@ -179,7 +185,7 @@ function DashboardLayoutContent({
                 <PanelLeft className="size-4" />
               </button>
               {!isCollapsed && (
-                <div className="min-w-0 cursor-pointer" onClick={() => setLocation("/inventario")}>
+                <div className="min-w-0 cursor-pointer" onClick={() => setLocation("/visao-geral")}>
                   <div className="flex items-center gap-2">
                     <span className="size-2 rounded-full bg-blue-500" />
                     <span className="truncate text-sm font-bold tracking-tight text-white">MR PAY</span>
@@ -313,14 +319,18 @@ function DashboardLayoutContent({
                   ? "Governança / Auditoria"
                   : location === "/operadores"
                   ? "Administração / Equipe"
-                  : "Operações / Ativos"}
+                  : location === "/inventario"
+                  ? "Operações / Inventário"
+                  : "Operações / Visão Geral"}
               </p>
               <p className="mt-1 text-sm font-semibold tracking-tight text-foreground">
                 {location === "/auditoria"
                   ? "Trilha de Auditoria e Alterações"
                   : location === "/operadores"
                   ? "Gestão de Operadores e Perfis"
-                  : "Controle Patrimonial & Fichas Técnicas"}
+                  : location === "/inventario"
+                  ? "Inventário Patrimonial & Fichas Técnicas"
+                  : "Visão Geral & Indicadores de Desempenho"}
               </p>
             </div>
           </div>

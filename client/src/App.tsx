@@ -43,6 +43,9 @@ function MainApp() {
           }}
         />
       </Route>
+      <Route path="/visao-geral">
+        <Home onExit={handleExit} />
+      </Route>
       <Route path="/inventario">
         <Home onExit={handleExit} />
       </Route>
