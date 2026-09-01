@@ -20,3 +20,4 @@
 - [x] Revisar package.json e remover dependência espúria `add`.
 - [x] Implementar auditoria completa de alterações por usuário com triggers Postgres, RLS, tela global e linha do tempo por ativo.
 - [x] Criar tela administrativa para gestão de operadores com governança de perfis (admin/operador) e permissões.
+- [x] Implementar limpeza total da base de dados e importação inteligente de planilhas Excel/CSV com mapeamento automático de colunas e trilha de auditoria.
