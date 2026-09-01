@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import React from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, vi, it } from "vitest";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import Home from "./Home";
 
 vi.mock("@/hooks/useSupabaseAuth", () => ({
-  useSupabaseAuth: () => ({ user: null, signOut: vi.fn(async () => undefined) }),
+  useSupabaseAuth: () => ({ user: null, loading: false, signOut: vi.fn(async () => undefined) }),
 }));
 
 vi.mock("@/lib/supabase", () => ({
@@ -21,24 +21,21 @@ beforeAll(() => {
   });
 });
 
-describe("Home navigation integration", () => {
+describe("Home unauthenticated navigation", () => {
   afterEach(() => {
     cleanup();
     window.history.replaceState(null, "", "/");
   });
 
-  it("moves the real Home flow to Visão geral and updates the hash", () => {
+  it("opens on the initial authentication screen when there is no session", () => {
     render(
       <ThemeProvider defaultTheme="light">
         <Home />
       </ThemeProvider>,
     );
 
-    const overviewButton = screen.getByTestId("overview-button");
-    fireEvent.click(overviewButton);
-
-    expect(window.location.hash).toBe("#visao-geral");
-    expect(overviewButton.getAttribute("data-active")).toBe("true");
-    expect(document.getElementById("visao-geral")).toBeTruthy();
+    expect(screen.getByText("Faça login para acessar o sistema de ativos")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Entrar no Sistema" })).toBeTruthy();
+    expect(screen.queryByTestId("overview-button")).toBeNull();
   });
 });

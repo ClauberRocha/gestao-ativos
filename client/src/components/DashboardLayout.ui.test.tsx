@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
 import React, { useState } from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import DashboardLayout from "./DashboardLayout";
 import { AuthDialog } from "@/pages/Home";
+import { toast } from "sonner";
+
+vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() } }));
 
 const signOut = vi.fn(async () => undefined);
 
@@ -62,6 +65,8 @@ function renderAdminUserCreateFlow() {
 describe("DashboardLayout user creation controls", () => {
   afterEach(() => {
     cleanup();
+    signOut.mockClear();
+    vi.mocked(toast.error).mockClear();
     window.history.replaceState(null, "", "/");
   });
   it("renders both create-user entry points for an authenticated admin", () => {
@@ -81,6 +86,19 @@ describe("DashboardLayout user creation controls", () => {
     fireEvent.click(screen.getByTestId("create-user-button"));
     expect(screen.getByTestId("user-create-dialog")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Criar acesso operacional" })).toBeTruthy();
+  });
+
+  it("calls signOut when the user clicks Sair", async () => {
+    renderLayout(false);
+    fireEvent.click(screen.getByLabelText("Sair"));
+    await waitFor(() => expect(signOut).toHaveBeenCalledOnce());
+  });
+
+  it("shows an error toast when signOut fails", async () => {
+    signOut.mockImplementationOnce(async () => { throw new Error("Sessão indisponível"); });
+    renderLayout(false);
+    fireEvent.click(screen.getByLabelText("Sair"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Não foi possível sair", { description: "Sessão indisponível" }));
   });
 
   it("calls the real overview navigation callback", () => {

@@ -25,3 +25,12 @@
 - [x] Corrigir a divergência entre `package.json` e `pnpm-lock.yaml` e validar uma implantação bem-sucedida.
 - [x] Executar uma nova publicação/implantação após sincronizar `pnpm-lock.yaml` com `package.json` e confirmar status de deploy bem-sucedido.
 - [x] Enviar o lockfile atualizado ao repositório remoto e revalidar o pipeline com `frozen-lockfile`.
+- [x] Adaptar a tela inicial de autenticação ao layout da referência e trocar a mensagem para `Faça login para acessar o sistema de ativos`.
+- [x] Redirecionar o usuário para a tela inicial de autenticação após sair do sistema.
+- [x] Criar carrossel autocontido em HTML/CSS/JavaScript puro para a tela inicial, com autoplay, fade, dots, pausa no hover e responsividade.
+- [x] Incluir arquivos `.test.tsx` e `.spec.tsx` no padrão do Vitest para executar a cobertura de UI do carrossel.
+- [x] Restaurar `jsdom` como dependência de desenvolvimento para executar os testes de UI em ambiente de navegador simulado.
+- [x] Atualizar o teste integrado de Home para refletir a tela inicial não autenticada e preservar a cobertura de navegação do layout autenticado.
+- [x] Corrigir o HTML standalone do carrossel para empilhar os slides e garantir que apenas a mensagem ativa ocupe espaço visual.
+- [x] Adicionar teste de UI do logout cobrindo clique em `Sair`, retorno à tela inicial e tratamento de falha de `signOut`.
+- [x] Registrar evidência visual comparativa de que a tela inicial reproduz a composição da referência anexada, além da alteração do texto.

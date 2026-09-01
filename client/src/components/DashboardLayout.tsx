@@ -13,6 +13,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,19 @@ export default function DashboardLayout({
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
   const { user, signOut } = useSupabaseAuth();
+  const [signOutPending, setSignOutPending] = useState(false);
+
+  const handleSignOut = async () => {
+    if (signOutPending) return;
+    setSignOutPending(true);
+    try {
+      await signOut();
+    } catch (error) {
+      toast.error("Não foi possível sair", { description: error instanceof Error ? error.message : "Tente novamente." });
+    } finally {
+      setSignOutPending(false);
+    }
+  };
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
@@ -67,7 +81,8 @@ export default function DashboardLayout({
         isAdmin={isAdmin}
         onOverviewClick={onOverviewClick}
         onInventoryClick={onInventoryClick}
-        onSignOut={signOut}
+        onSignOut={handleSignOut}
+        signOutPending={signOutPending}
       >
         {children}
       </DashboardLayoutContent>
@@ -85,9 +100,10 @@ type LayoutContentProps = {
   onOverviewClick: () => void;
   onInventoryClick: () => void;
   onSignOut: () => Promise<void>;
+  signOutPending: boolean;
 };
 
-function DashboardLayoutContent({ children, setSidebarWidth, user, onOpenAuth, onOpenUserCreate, isAdmin, onOverviewClick, onInventoryClick, onSignOut }: LayoutContentProps) {
+function DashboardLayoutContent({ children, setSidebarWidth, user, onOpenAuth, onOpenUserCreate, isAdmin, onOverviewClick, onInventoryClick, onSignOut, signOutPending }: LayoutContentProps) {
   const { state, toggleSidebar } = useSidebar();
   const { theme, toggleTheme } = useTheme();
   const isCollapsed = state === "collapsed";
@@ -190,7 +206,7 @@ function DashboardLayoutContent({ children, setSidebarWidth, user, onOpenAuth, o
                   </div>
                 )}
                 {!isCollapsed && (
-                  <button onClick={() => void onSignOut()} aria-label="Sair" className="rounded-lg p-1.5 text-sidebar-foreground/45 transition hover:bg-sidebar-accent hover:text-sidebar-foreground">
+                  <button onClick={() => void onSignOut()} aria-label="Sair" aria-busy={signOutPending} disabled={signOutPending} className="rounded-lg p-1.5 text-sidebar-foreground/45 transition hover:bg-sidebar-accent hover:text-sidebar-foreground disabled:cursor-wait disabled:opacity-50">
                     <LogOut className="size-3.5" />
                   </button>
                 )}
