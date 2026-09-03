@@ -34,3 +34,17 @@
 - [x] Corrigir o HTML standalone do carrossel para empilhar os slides e garantir que apenas a mensagem ativa ocupe espaço visual.
 - [x] Adicionar teste de UI do logout cobrindo clique em `Sair`, retorno à tela inicial e tratamento de falha de `signOut`.
 - [x] Registrar evidência visual comparativa de que a tela inicial reproduz a composição da referência anexada, além da alteração do texto.
+- [x] Inverter a ordem dos menus para exibir Visão geral antes de Inventário.
+- [x] Disponibilizar limpeza dos registros atuais de ativos com confirmação administrativa, preservando perfis e logs.
+- [x] Implementar importação de Excel com mapeamento de campos, suporte a campos novos e validação antes da gravação.
+- [x] Implementar exportação do inventário para Excel respeitando permissões de valor de aquisição.
+- [x] Criar menu de Logs com registros de login, logout, inclusão, alteração e exclusão.
+- [x] Adicionar filtros por Patrimônio, status, conservação, conta cliente e intervalo de datas.
+- [x] Atualizar schema, RLS, testes e documentação da ampliação.
+- [x] Implementar importação Excel/CSV com arrastar e soltar, prévia, validação, mapeamento e campos extras em JSONB.
+- [x] Implementar substituição segura da base com confirmação explícita e transação de limpeza/importação.
+- [x] Implementar exportação XLSX filtrada com colunas legíveis, status formatado e log de quantidade.
+- [x] Registrar login, logout, inclusão, edição, exclusão, importação, limpeza e exportação com usuário, data/hora, IP/dispositivo quando disponível.
+- [x] Criar tela/menu de Logs com filtros, detalhes de alterações e acesso restrito a administradores.
+- [x] Expandir filtros do inventário para Patrimônio, status, conservação, conta cliente e intervalo de datas.
+- [x] Adicionar testes de UI, integração, permissões e documentação para os fluxos de importação, exportação, limpeza e logs.

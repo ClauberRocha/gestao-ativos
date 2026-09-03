@@ -19,13 +19,15 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
 import { getThemeToggleLabel, getThemeToggleTitle } from "@/lib/theme";
 import { MR_PAY_LOGO_URL } from "@/lib/brand";
+import { recordAudit } from "@/lib/audit";
 import { canCreateUsers } from "@/lib/user-permissions";
-import { Archive, BarChart3, ChevronRight, LogIn, LogOut, Moon, PanelLeft, Settings2, Sun, UserRound } from "lucide-react";
+import { Archive, BarChart3, ChevronRight, ClipboardList, LogIn, LogOut, Moon, PanelLeft, Settings2, Sun, UserRound } from "lucide-react";
 import React, { CSSProperties, useEffect, useRef, useState } from "react";
 
 const menuItems = [
-  { icon: Archive, label: "Inventário", active: true },
   { icon: BarChart3, label: "Visão geral", active: false },
+  { icon: Archive, label: "Inventário", active: true },
+  { icon: ClipboardList, label: "Logs", active: false, adminOnly: true },
 ];
 
 const SIDEBAR_WIDTH_KEY = "asset-sidebar-width";
@@ -40,6 +42,7 @@ export default function DashboardLayout({
   isAdmin,
   onOverviewClick,
   onInventoryClick,
+  onLogsClick,
 }: {
   children: React.ReactNode;
   onOpenAuth: () => void;
@@ -47,6 +50,7 @@ export default function DashboardLayout({
   isAdmin?: boolean;
   onOverviewClick: () => void;
   onInventoryClick: () => void;
+  onLogsClick?: () => void;
 }) {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
@@ -59,6 +63,7 @@ export default function DashboardLayout({
     if (signOutPending) return;
     setSignOutPending(true);
     try {
+      await recordAudit(user?.id, "logout");
       await signOut();
     } catch (error) {
       toast.error("Não foi possível sair", { description: error instanceof Error ? error.message : "Tente novamente." });
@@ -81,6 +86,7 @@ export default function DashboardLayout({
         isAdmin={isAdmin}
         onOverviewClick={onOverviewClick}
         onInventoryClick={onInventoryClick}
+        onLogsClick={onLogsClick ?? (() => undefined)}
         onSignOut={handleSignOut}
         signOutPending={signOutPending}
       >
@@ -99,15 +105,16 @@ type LayoutContentProps = {
   isAdmin?: boolean;
   onOverviewClick: () => void;
   onInventoryClick: () => void;
+  onLogsClick?: () => void;
   onSignOut: () => Promise<void>;
   signOutPending: boolean;
 };
 
-function DashboardLayoutContent({ children, setSidebarWidth, user, onOpenAuth, onOpenUserCreate, isAdmin, onOverviewClick, onInventoryClick, onSignOut, signOutPending }: LayoutContentProps) {
+function DashboardLayoutContent({ children, setSidebarWidth, user, onOpenAuth, onOpenUserCreate, isAdmin, onOverviewClick, onInventoryClick, onLogsClick, onSignOut, signOutPending }: LayoutContentProps) {
   const { state, toggleSidebar } = useSidebar();
   const { theme, toggleTheme } = useTheme();
   const isCollapsed = state === "collapsed";
-  const [activeMenu, setActiveMenu] = useState(() => window.location.hash === "#visao-geral" ? "Visão geral" : "Inventário");
+  const [activeMenu, setActiveMenu] = useState(() => window.location.hash === "#visao-geral" ? "Visão geral" : window.location.hash === "#logs" ? "Logs" : "Inventário");
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
@@ -165,15 +172,15 @@ function DashboardLayoutContent({ children, setSidebarWidth, user, onOpenAuth, o
           <SidebarContent className="px-2 py-5">
             {!isCollapsed && <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Workspace</p>}
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {menuItems.filter((item) => !item.adminOnly || isAdmin).map((item) => (
                 <SidebarMenuItem key={item.label}>
                   <SidebarMenuButton
                     isActive={activeMenu === item.label}
                     tooltip={item.label}
-                    data-testid={item.label === "Visão geral" ? "overview-button" : "inventory-button"}
+                    data-testid={item.label === "Visão geral" ? "overview-button" : item.label === "Logs" ? "logs-button" : "inventory-button"}
                     data-active={activeMenu === item.label ? "true" : "false"}
                     className={cn("h-10 rounded-xl px-3 text-sm", activeMenu === item.label && "font-semibold")}
-                    onClick={() => { setActiveMenu(item.label); if (item.label === "Visão geral") onOverviewClick(); else onInventoryClick(); }}
+                    onClick={() => { setActiveMenu(item.label); if (item.label === "Visão geral") onOverviewClick(); else if (item.label === "Logs") onLogsClick?.(); else onInventoryClick(); }}
                   >
                     <item.icon className="size-4" />
                     <span>{item.label}</span>

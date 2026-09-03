@@ -25,7 +25,7 @@ vi.mock("@/hooks/useSupabaseAuth", () => ({
   }),
 }));
 
-function renderLayout(isAdmin: boolean, onOverviewClick = vi.fn()) {
+function renderLayout(isAdmin: boolean, onOverviewClick = vi.fn(), onLogsClick = vi.fn()) {
   return render(
     <ThemeProvider defaultTheme="light">
       <DashboardLayout
@@ -34,6 +34,7 @@ function renderLayout(isAdmin: boolean, onOverviewClick = vi.fn()) {
         isAdmin={isAdmin}
         onOverviewClick={onOverviewClick}
         onInventoryClick={vi.fn()}
+        onLogsClick={onLogsClick}
       >
         <div>Conteúdo</div>
       </DashboardLayout>
@@ -52,6 +53,7 @@ function renderAdminUserCreateFlow() {
           isAdmin
           onOverviewClick={vi.fn()}
           onInventoryClick={vi.fn()}
+          onLogsClick={vi.fn()}
         >
           <div>Conteúdo</div>
         </DashboardLayout>
@@ -79,6 +81,23 @@ describe("DashboardLayout user creation controls", () => {
     renderLayout(false);
     expect(screen.queryByTestId("create-user-button")).toBeNull();
     expect(screen.queryByTestId("create-user-header-button")).toBeNull();
+    expect(screen.queryByTestId("logs-button")).toBeNull();
+  });
+
+  it("renders Visão geral before Inventário and shows Logs only for admin", () => {
+    renderLayout(true);
+    const overview = screen.getByTestId("overview-button");
+    const inventory = screen.getByTestId("inventory-button");
+    expect(overview.compareDocumentPosition(inventory) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId("logs-button")).toBeTruthy();
+  });
+
+  it("calls the Logs navigation callback for an admin", () => {
+    const onLogsClick = vi.fn();
+    renderLayout(true, vi.fn(), onLogsClick);
+    fireEvent.click(screen.getByTestId("logs-button"));
+    expect(onLogsClick).toHaveBeenCalledOnce();
+    expect(screen.getByTestId("logs-button").getAttribute("data-active")).toBe("true");
   });
 
   it("opens the signup dialog when the admin clicks Criar usuário", () => {

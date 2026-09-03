@@ -30,6 +30,7 @@ export type Asset = {
   conservacao: string | null;
   valor_aquisicao?: number | null;
   observacoes: string | null;
+  extra_data?: Record<string, unknown>;
   created_at?: string;
   updated_at?: string;
 };

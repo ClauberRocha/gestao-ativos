@@ -12,6 +12,8 @@ import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetT
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import DashboardLayout from "@/components/DashboardLayout";
+import AssetDataActions from "@/components/AssetDataActions";
+import AuditLogPanel, { type AuditLogEntry } from "@/components/AuditLogPanel";
 import { getUserCreationMode } from "@/lib/user-permissions";
 import { getMenuHash } from "@/lib/navigation";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
@@ -19,6 +21,8 @@ import { ASSET_STATUSES, formatCurrency, sampleAssets, searchAssets } from "@/li
 import { ASSET_SAVED_MESSAGE, getAssetSaveAction } from "@/lib/asset-form";
 import { isSupabaseConfigured, supabase, type Asset, type AssetStatus, type Profile } from "@/lib/supabase";
 import { MR_PAY_LOGO_URL } from "@/lib/brand";
+import { downloadAssetsXlsx, type ImportRow } from "@/lib/spreadsheet";
+import { recordAudit } from "@/lib/audit";
 
 const PAGE_SIZE = 8;
 type StatusFilter = AssetStatus | "Todos";
@@ -30,6 +34,20 @@ const statusStyles: Record<AssetStatus, string> = {
   Entregue: "border-sky-200 bg-sky-50 text-sky-700",
   Defeito: "border-red-200 bg-red-50 text-red-700",
 };
+
+function filterAssetRows(rows: Asset[], query: string, status: StatusFilter, conservacao: string, contaCliente: string, dateFrom: string, dateTo: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  return rows.filter((asset) => {
+    const matchesQuery = !normalizedQuery || asset.patrimonio.toLowerCase().includes(normalizedQuery) || asset.numero_serie.toLowerCase().includes(normalizedQuery);
+    const matchesStatus = status === "Todos" || asset.status === status;
+    const matchesConservation = !conservacao || (asset.conservacao ?? "") === conservacao;
+    const matchesClient = !contaCliente || (asset.conta_cliente ?? "").toLowerCase().includes(contaCliente.trim().toLowerCase());
+    const dateValue = new Date(asset.updated_at ?? asset.created_at ?? 0).getTime();
+    const matchesFrom = !dateFrom || dateValue >= new Date(`${dateFrom}T00:00:00`).getTime();
+    const matchesTo = !dateTo || dateValue <= new Date(`${dateTo}T23:59:59.999`).getTime();
+    return matchesQuery && matchesStatus && matchesConservation && matchesClient && matchesFrom && matchesTo;
+  });
+}
 
 const emptyForm: AssetFormData = {
   patrimonio: "",
@@ -62,6 +80,8 @@ export function AuthDialog({ open, onOpenChange, initialMode = "login", allowSig
     try {
       if (mode === "login") {
         await signIn(email, password);
+        const { data: sessionData } = await supabase.auth.getUser();
+        await recordAudit(sessionData.user?.id, "login", { email });
         toast.success("Sessão iniciada", { description: "Inventário protegido carregado." });
       } else {
         await signUp(email, password, fullName);
@@ -137,6 +157,10 @@ export default function Home() {
   const [metrics, setMetrics] = useState({ total: sampleAssets.length, stock: 3, clients: 7, defects: 2 });
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("Todos");
+  const [conservacao, setConservacao] = useState("");
+  const [contaCliente, setContaCliente] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [usingDemoData, setUsingDemoData] = useState(true);
@@ -150,6 +174,20 @@ export default function Home() {
   const [saveCompleted, setSaveCompleted] = useState(false);
   const isAdmin = profile?.role === "admin";
   const overviewRef = useRef<HTMLElement | null>(null);
+  const [showLogs, setShowLogs] = useState(false);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+
+  const loadAuditLogs = useCallback(async () => {
+    if (!showLogs || !user || !isAdmin || !isSupabaseConfigured) return;
+    setAuditLoading(true);
+    const { data, error } = await supabase.from("audit_logs").select("id, actor_id, actor_email, action, entity_type, asset_patrimonio, details, ip_address, user_agent, created_at").order("created_at", { ascending: false }).limit(100);
+    if (!error) setAuditLogs((data ?? []) as AuditLogEntry[]);
+    else toast.error("Não foi possível carregar os logs", { description: error.message });
+    setAuditLoading(false);
+  }, [showLogs, user, isAdmin]);
+
+  useEffect(() => { void loadAuditLogs(); }, [loadAuditLogs]);
 
   const loadProfile = useCallback(async () => {
     if (!user) { setProfile(null); return; }
@@ -163,7 +201,7 @@ export default function Home() {
     setLoading(true);
     setConnectionError(null);
     if (!user || !isSupabaseConfigured) {
-      const filtered = searchAssets(sampleAssets, query, status);
+      const filtered = filterAssetRows(sampleAssets, query, status, conservacao, contaCliente, dateFrom, dateTo);
       setTotal(filtered.length);
       setAssets(filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE));
       setMetrics({ total: sampleAssets.length, stock: sampleAssets.filter((asset) => asset.status === "Em estoque").length, clients: sampleAssets.filter((asset) => asset.status === "Ativo" || asset.status === "Entregue").length, defects: sampleAssets.filter((asset) => asset.status === "Defeito").length });
@@ -174,6 +212,10 @@ export default function Home() {
     try {
       let request = supabase.from("assets_inventory").select("*", { count: "exact" }).order("updated_at", { ascending: false });
       if (status !== "Todos") request = request.eq("status", status);
+      if (conservacao) request = request.eq("conservacao", conservacao);
+      if (contaCliente.trim()) request = request.ilike("conta_cliente", `%${contaCliente.trim()}%`);
+      if (dateFrom) request = request.gte("updated_at", `${dateFrom}T00:00:00`);
+      if (dateTo) request = request.lte("updated_at", `${dateTo}T23:59:59.999`);
       if (query.trim()) {
         const safeQuery = query.trim().replace(/[%,()]/g, "");
         request = request.or(`patrimonio.ilike.%${safeQuery}%,numero_serie.ilike.%${safeQuery}%`);
@@ -189,7 +231,7 @@ export default function Home() {
       setUsingDemoData(false);
     } catch (error) {
       if (!user) {
-        const filtered = searchAssets(sampleAssets, query, status);
+        const filtered = filterAssetRows(sampleAssets, query, status, conservacao, contaCliente, dateFrom, dateTo);
         setTotal(filtered.length);
         setAssets(filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE));
         setUsingDemoData(true);
@@ -201,7 +243,7 @@ export default function Home() {
       }
       setConnectionError(error instanceof Error ? error.message : "A tabela ainda não está disponível.");
     } finally { setLoading(false); }
-  }, [page, query, status, user]);
+  }, [page, query, status, conservacao, contaCliente, dateFrom, dateTo, user]);
 
   useEffect(() => { const timer = window.setTimeout(() => void loadAssets(), 180); return () => window.clearTimeout(timer); }, [loadAssets]);
 
@@ -214,7 +256,7 @@ export default function Home() {
   const visibleRangeEnd = Math.min(page * PAGE_SIZE, total);
   const updateQuery = (value: string) => { setQuery(value); setPage(1); };
   const updateStatus = (value: StatusFilter) => { setStatus(value); setPage(1); };
-  const resetFilters = () => { setQuery(""); setStatus("Todos"); setPage(1); };
+  const resetFilters = () => { setQuery(""); setStatus("Todos"); setConservacao(""); setContaCliente(""); setDateFrom(""); setDateTo(""); setPage(1); };
   const openNewAsset = () => { if (!user) { setAuthMode("login"); setAuthOpen(true); toast.info("Entre para cadastrar um ativo"); return; } setEditingAsset(null); setForm(emptyForm); setSaveCompleted(false); setSheetOpen(true); };
   const openAsset = (asset: Asset) => {
     if (user && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(asset.id)) {
@@ -241,7 +283,7 @@ export default function Home() {
     setSaveCompleted(false);
     setSaving(true);
     try {
-      const payload = { ...form, conta_cliente: form.conta_cliente || null, local: form.local || null, conservacao: form.conservacao || null, observacoes: form.observacoes || null, valor_aquisicao: isAdmin ? form.valor_aquisicao : undefined };
+      const payload = { ...form, conta_cliente: form.conta_cliente || null, local: form.local || null, conservacao: form.conservacao || null, observacoes: form.observacoes || null, valor_aquisicao: isAdmin ? form.valor_aquisicao : undefined, extra_data: editingAsset?.extra_data ?? {} };
       const result = editingAsset ? await supabase.from("assets").update(payload).eq("id", editingAsset.id) : await supabase.from("assets").insert(payload);
       if (result.error) throw result.error;
       toast.success(ASSET_SAVED_MESSAGE, { description: `${form.patrimonio} foi salvo no inventário.` });
@@ -262,12 +304,47 @@ export default function Home() {
     await loadAssets();
   };
 
-  return <DashboardLayout onOpenAuth={() => { setAuthMode("login"); setAuthOpen(true); }} onOpenUserCreate={openUserCreate} isAdmin={isAdmin} onOverviewClick={() => { window.history.replaceState(null, "", getMenuHash("Visão geral")); const overview = overviewRef.current; if (overview && typeof overview.scrollIntoView === "function") overview.scrollIntoView({ behavior: "smooth", block: "start" }); }} onInventoryClick={() => { window.history.replaceState(null, "", getMenuHash("Inventário")); const inventory = document.getElementById("inventario"); if (inventory && typeof inventory.scrollIntoView === "function") inventory.scrollIntoView({ behavior: "smooth", block: "start" }); }}><div className="mx-auto max-w-[1480px] space-y-6">
+  const importAssets = async (rows: ImportRow[], fileName: string, extraHeaders: string[]) => {
+    if (!user || !isAdmin || !isSupabaseConfigured) { toast.error("Apenas administradores podem importar a base"); return; }
+    const { data, error } = await supabase.rpc("replace_assets", { payload: rows, source_file: fileName });
+    if (error) { toast.error("Importação não concluída", { description: error.message }); return; }
+    toast.success("Base substituída com segurança", { description: `${Number(data ?? rows.length)} registros importados. Campos extras preservados: ${extraHeaders.length}.` });
+    await loadAssets();
+  };
+
+  const exportAssets = async () => {
+    if (!user || !isSupabaseConfigured) { toast.error("Entre no sistema para exportar a base"); return; }
+    let request = supabase.from("assets_inventory").select("*").order("updated_at", { ascending: false });
+    if (status !== "Todos") request = request.eq("status", status);
+    if (conservacao) request = request.eq("conservacao", conservacao);
+    if (contaCliente.trim()) request = request.ilike("conta_cliente", `%${contaCliente.trim()}%`);
+    if (dateFrom) request = request.gte("updated_at", `${dateFrom}T00:00:00`);
+    if (dateTo) request = request.lte("updated_at", `${dateTo}T23:59:59.999`);
+    if (query.trim()) { const safeQuery = query.trim().replace(/[%,()]/g, ""); request = request.or(`patrimonio.ilike.%${safeQuery}%,numero_serie.ilike.%${safeQuery}%`); }
+    const { data, error } = await request;
+    if (error) { toast.error("Exportação não concluída", { description: error.message }); return; }
+    const rows = (data ?? []) as Asset[];
+    downloadAssetsXlsx(rows, isAdmin, `mr-pay-ativos-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    await recordAudit(user.id, "export", { count: rows.length, filters: { query, status, conservacao, contaCliente, dateFrom, dateTo } });
+    toast.success("Arquivo exportado", { description: `${rows.length} registros exportados.` });
+  };
+
+  const clearAssets = async () => {
+    if (!user || !isAdmin || !isSupabaseConfigured) { toast.error("Apenas administradores podem limpar a base"); return; }
+    if (!window.confirm("Limpar toda a base atual de ativos? Perfis e logs serão preservados.")) return;
+    const { data, error } = await supabase.rpc("clear_assets");
+    if (error) { toast.error("A base não foi limpa", { description: error.message }); return; }
+    toast.success("Base atual limpa", { description: `${Number(data ?? 0)} registros removidos. Perfis e logs foram preservados.` });
+    await loadAssets();
+  };
+
+  return <DashboardLayout onOpenAuth={() => { setAuthMode("login"); setAuthOpen(true); }} onOpenUserCreate={openUserCreate} isAdmin={isAdmin} onOverviewClick={() => { setShowLogs(false); window.history.replaceState(null, "", getMenuHash("Visão geral")); const overview = overviewRef.current; if (overview && typeof overview.scrollIntoView === "function") overview.scrollIntoView({ behavior: "smooth", block: "start" }); }} onInventoryClick={() => { setShowLogs(false); window.history.replaceState(null, "", getMenuHash("Inventário")); const inventory = document.getElementById("inventario"); if (inventory && typeof inventory.scrollIntoView === "function") inventory.scrollIntoView({ behavior: "smooth", block: "start" }); }} onLogsClick={() => { setShowLogs(true); window.history.replaceState(null, "", "#logs"); window.setTimeout(() => document.getElementById("logs")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0); }}><div className="mx-auto max-w-[1480px] space-y-6">{showLogs ? <AuditLogPanel logs={auditLogs} loading={auditLoading} onRefresh={() => void loadAuditLogs()} /> : <div className="contents">
     <section id="visao-geral" ref={overviewRef} className="scroll-mt-24 relative overflow-hidden rounded-3xl border border-slate-200/80 bg-slate-950 px-6 py-7 text-white shadow-[0_18px_55px_-28px_rgba(15,23,42,0.6)] sm:px-8 sm:py-8"><div className="absolute -right-20 -top-28 size-80 rounded-full bg-indigo-500/20 blur-3xl" /><div className="absolute bottom-[-120px] left-[38%] size-72 rounded-full bg-cyan-400/10 blur-3xl" /><div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,0.10)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.10)_1px,transparent_1px)] [background-size:38px_38px]" /><div className="relative flex flex-col justify-between gap-8 lg:flex-row lg:items-end"><div className="max-w-2xl"><div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300"><Sparkles className="size-3 text-cyan-300" /> Mr Pay Ativos · Centro de Comando de Ativos</div><h1 className="max-w-xl text-3xl font-semibold leading-[1.05] tracking-[-0.04em] sm:text-4xl">Controle patrimonial sem pontos cegos.</h1><p className="mt-4 max-w-xl text-sm leading-6 text-slate-300">Localize cada Totem, Pin Pad e Desktop com uma operação preparada para conferência, transferência e atendimento.</p></div><div className="grid grid-cols-2 gap-x-8 gap-y-4 border-t border-white/10 pt-5 sm:flex sm:border-l sm:border-t-0 sm:pl-8 sm:pt-0"><div><p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Ativos monitorados</p><p className="mt-1 font-mono text-2xl font-semibold tracking-tight">{metrics.total}</p></div><div><p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Em operação</p><p className="mt-1 font-mono text-2xl font-semibold tracking-tight">{metrics.clients}</p></div><div className="col-span-2 flex items-center gap-2 text-xs text-slate-400"><span className="size-1.5 rounded-full bg-emerald-400" /> {usingDemoData ? "Demonstração local" : "Sincronizado com Supabase"}</div></div></div></section>
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><KpiCard label="Total de ativos" value={metrics.total} detail="Base patrimonial" icon={Boxes} tone="bg-indigo-50 text-indigo-700" /><KpiCard label="Em estoque" value={metrics.stock} detail="Disponíveis para alocação" icon={PackageCheck} tone="bg-amber-50 text-amber-700" /><KpiCard label="Em clientes" value={metrics.clients} detail="Ativos ou entregues" icon={Users} tone="bg-emerald-50 text-emerald-700" /><KpiCard label="Com defeito" value={metrics.defects} detail="Aguardando tratativa" icon={CircleAlert} tone="bg-red-50 text-red-700" /></section>
-    <section id="inventario" className="scroll-mt-24 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><div className="flex items-center gap-2"><h2 className="text-xl font-semibold tracking-tight">Inventário</h2><Badge variant="secondary" className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">{total} registros</Badge></div><p className="mt-1 text-sm text-muted-foreground">Consulte patrimônio ou número de série em uma única busca.</p></div><div className="flex items-center gap-2"><div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex"><Database className="size-3.5" /> {usingDemoData ? "Demonstração" : "Supabase"}</div><Button onClick={openNewAsset} size="sm" className="h-9 rounded-xl px-3 text-xs shadow-sm"><Plus className="mr-1.5 size-3.5" /> Novo ativo</Button></div></section>
-    <section className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-[0_10px_40px_-32px_rgba(15,23,42,0.55)]"><div className="flex flex-col gap-3 border-b border-border/70 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"><div className="relative min-w-0 flex-1 sm:max-w-[480px]"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input data-testid="asset-search-input" aria-label="Buscar por patrimônio ou número de série" value={query} onChange={(event) => updateQuery(event.target.value)} placeholder="Buscar patrimônio ou número de série..." className="h-10 rounded-xl border-border/80 bg-muted/35 pl-9 pr-9 text-sm shadow-none focus-visible:bg-background" />{query && <button type="button" onClick={() => updateQuery("")} aria-label="Limpar busca" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition hover:text-foreground"><X className="size-3.5" /></button>}</div><div className="flex items-center gap-2"><div className="hidden items-center gap-1.5 text-xs font-medium text-muted-foreground sm:flex"><SlidersHorizontal className="size-3.5" /> Filtrar por</div><Select value={status} onValueChange={(value) => updateStatus(value as StatusFilter)}><SelectTrigger aria-label="Filtrar por status" className="h-10 w-full rounded-xl bg-muted/35 text-xs sm:w-[160px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Todos">Todos os status</SelectItem>{ASSET_STATUSES.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div></div>{connectionError && <div className="flex flex-col gap-2 border-b border-amber-200 bg-amber-50 px-5 py-3 text-xs text-amber-800 sm:flex-row sm:items-center sm:justify-between"><span><strong>Modo demonstração:</strong> a tabela Supabase não respondeu. Execute <code className="rounded bg-amber-100 px-1">supabase/schema.sql</code> no SQL Editor para carregar os dados reais.</span><button type="button" onClick={() => setConnectionError(null)} className="font-semibold underline underline-offset-2">Ocultar</button></div>}<div className="relative overflow-x-auto"><div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5 overflow-hidden bg-primary/15">{loading && <div className="asset-loading-bar h-full w-1/3 rounded-full bg-primary" />}</div><Table><TableHeader><TableRow className="hover:bg-transparent"><TableHead className="w-[152px]">Patrimônio</TableHead><TableHead>Descrição</TableHead><TableHead>Cliente / local</TableHead><TableHead>Status</TableHead><TableHead>Conservação</TableHead><TableHead>Número de série</TableHead><TableHead className="text-right">Aquisição</TableHead></TableRow></TableHeader><TableBody>{loading ? <TableLoading /> : assets.length === 0 ? <TableRow><TableCell colSpan={7} className="h-48 text-center"><div className="mx-auto flex max-w-xs flex-col items-center"><div className="mb-3 flex size-10 items-center justify-center rounded-2xl bg-muted"><Search className="size-4 text-muted-foreground" /></div><p className="text-sm font-semibold">Nenhum ativo encontrado</p><p className="mt-1 text-xs text-muted-foreground">Ajuste os termos de busca ou limpe os filtros.</p><Button variant="ghost" size="sm" onClick={resetFilters} className="mt-3 text-xs">Limpar filtros</Button></div></TableCell></TableRow> : assets.map((asset) => <TableRow key={asset.id} className="group cursor-pointer" tabIndex={0} onClick={() => openAsset(asset)} onKeyDown={(event) => { if (event.key === "Enter") openAsset(asset); }}><TableCell><span className="font-mono text-xs font-semibold tracking-tight text-foreground">{asset.patrimonio}</span></TableCell><TableCell><div className="max-w-[220px]"><p className="truncate text-sm font-medium">{asset.descricao}</p><p className="mt-0.5 text-[11px] text-muted-foreground">ID · {asset.id.slice(0, 8).toUpperCase()}</p></div></TableCell><TableCell><p className="text-xs font-semibold">{asset.conta_cliente || "—"}</p><p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground"><MapPin className="size-3" /> {asset.local || "Local não informado"}</p></TableCell><TableCell><StatusBadge status={asset.status} /></TableCell><TableCell><span className="text-xs text-muted-foreground">{asset.conservacao || "—"}</span></TableCell><TableCell><span className="font-mono text-[11px] text-muted-foreground">{asset.numero_serie}</span></TableCell><TableCell className="text-right"><span className="text-xs font-medium text-muted-foreground">{isAdmin ? formatCurrency(asset.valor_aquisicao) : "••••••"}</span></TableCell></TableRow>)}</TableBody></Table></div><div className="flex flex-col gap-3 border-t border-border/70 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5"><p className="text-xs text-muted-foreground">Mostrando <span className="font-medium text-foreground">{visibleRangeStart}–{visibleRangeEnd}</span> de <span className="font-medium text-foreground">{total}</span> ativos</p><div className="flex items-center gap-1.5"><Button variant="outline" size="icon" aria-label="Página anterior" disabled={page === 1 || loading} onClick={() => setPage((current) => Math.max(1, current - 1))} className="size-8 rounded-lg bg-background"><ChevronLeft className="size-3.5" /></Button><span className="min-w-16 text-center text-xs font-medium text-muted-foreground">Página {page} / {totalPages}</span><Button variant="outline" size="icon" aria-label="Próxima página" disabled={page >= totalPages || loading} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} className="size-8 rounded-lg bg-background"><ChevronRight className="size-3.5" /></Button></div></div></section>
+    <section id="inventario" className="scroll-mt-24 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><div className="flex items-center gap-2"><h2 className="text-xl font-semibold tracking-tight">Inventário</h2><Badge variant="secondary" className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">{total} registros</Badge></div><p className="mt-1 text-sm text-muted-foreground">Consulte patrimônio ou número de série em uma única busca.</p></div><div className="flex flex-wrap items-center justify-end gap-2"><div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex"><Database className="size-3.5" /> {usingDemoData ? "Demonstração" : "Supabase"}</div><AssetDataActions isAdmin={isAdmin} onImport={importAssets} onExport={() => void exportAssets()} onClear={clearAssets} /><Button onClick={openNewAsset} size="sm" className="h-9 rounded-xl px-3 text-xs shadow-sm"><Plus className="mr-1.5 size-3.5" /> Novo ativo</Button></div></section>
+    <section className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-[0_10px_40px_-32px_rgba(15,23,42,0.55)]"><div className="flex flex-col gap-3 border-b border-border/70 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"><div className="relative min-w-0 flex-1 sm:max-w-[480px]"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input data-testid="asset-search-input" aria-label="Buscar por patrimônio ou número de série" value={query} onChange={(event) => updateQuery(event.target.value)} placeholder="Buscar patrimônio ou número de série..." className="h-10 rounded-xl border-border/80 bg-muted/35 pl-9 pr-9 text-sm shadow-none focus-visible:bg-background" />{query && <button type="button" onClick={() => updateQuery("")} aria-label="Limpar busca" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition hover:text-foreground"><X className="size-3.5" /></button>}</div><div className="flex items-center gap-2"><div className="hidden items-center gap-1.5 text-xs font-medium text-muted-foreground sm:flex"><SlidersHorizontal className="size-3.5" /> Filtrar por</div><Select value={status} onValueChange={(value) => updateStatus(value as StatusFilter)}><SelectTrigger aria-label="Filtrar por status" className="h-10 w-full rounded-xl bg-muted/35 text-xs sm:w-[160px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Todos">Todos os status</SelectItem>{ASSET_STATUSES.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div></div><div className="grid gap-2 border-t border-border/60 bg-muted/15 p-4 sm:grid-cols-2 lg:grid-cols-4"><Input aria-label="Filtrar por conservação" value={conservacao} onChange={(event) => { setConservacao(event.target.value); setPage(1); }} placeholder="Conservação" className="h-9 rounded-lg bg-background text-xs" /><Input aria-label="Filtrar por conta cliente" value={contaCliente} onChange={(event) => { setContaCliente(event.target.value); setPage(1); }} placeholder="Conta cliente" className="h-9 rounded-lg bg-background text-xs" /><Input aria-label="Data inicial" type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setPage(1); }} className="h-9 rounded-lg bg-background text-xs" /><Input aria-label="Data final" type="date" value={dateTo} onChange={(event) => { setDateTo(event.target.value); setPage(1); }} className="h-9 rounded-lg bg-background text-xs" /></div>{connectionError && <div className="flex flex-col gap-2 border-b border-amber-200 bg-amber-50 px-5 py-3 text-xs text-amber-800 sm:flex-row sm:items-center sm:justify-between"><span><strong>Modo demonstração:</strong> a tabela Supabase não respondeu. Execute <code className="rounded bg-amber-100 px-1">supabase/schema.sql</code> no SQL Editor para carregar os dados reais.</span><button type="button" onClick={() => setConnectionError(null)} className="font-semibold underline underline-offset-2">Ocultar</button></div>}<div className="relative overflow-x-auto"><div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5 overflow-hidden bg-primary/15">{loading && <div className="asset-loading-bar h-full w-1/3 rounded-full bg-primary" />}</div><Table><TableHeader><TableRow className="hover:bg-transparent"><TableHead className="w-[152px]">Patrimônio</TableHead><TableHead>Descrição</TableHead><TableHead>Cliente / local</TableHead><TableHead>Status</TableHead><TableHead>Conservação</TableHead><TableHead>Número de série</TableHead><TableHead className="text-right">Aquisição</TableHead></TableRow></TableHeader><TableBody>{loading ? <TableLoading /> : assets.length === 0 ? <TableRow><TableCell colSpan={7} className="h-48 text-center"><div className="mx-auto flex max-w-xs flex-col items-center"><div className="mb-3 flex size-10 items-center justify-center rounded-2xl bg-muted"><Search className="size-4 text-muted-foreground" /></div><p className="text-sm font-semibold">Nenhum ativo encontrado</p><p className="mt-1 text-xs text-muted-foreground">Ajuste os termos de busca ou limpe os filtros.</p><Button variant="ghost" size="sm" onClick={resetFilters} className="mt-3 text-xs">Limpar filtros</Button></div></TableCell></TableRow> : assets.map((asset) => <TableRow key={asset.id} className="group cursor-pointer" tabIndex={0} onClick={() => openAsset(asset)} onKeyDown={(event) => { if (event.key === "Enter") openAsset(asset); }}><TableCell><span className="font-mono text-xs font-semibold tracking-tight text-foreground">{asset.patrimonio}</span></TableCell><TableCell><div className="max-w-[220px]"><p className="truncate text-sm font-medium">{asset.descricao}</p><p className="mt-0.5 text-[11px] text-muted-foreground">ID · {asset.id.slice(0, 8).toUpperCase()}</p></div></TableCell><TableCell><p className="text-xs font-semibold">{asset.conta_cliente || "—"}</p><p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground"><MapPin className="size-3" /> {asset.local || "Local não informado"}</p></TableCell><TableCell><StatusBadge status={asset.status} /></TableCell><TableCell><span className="text-xs text-muted-foreground">{asset.conservacao || "—"}</span></TableCell><TableCell><span className="font-mono text-[11px] text-muted-foreground">{asset.numero_serie}</span></TableCell><TableCell className="text-right"><span className="text-xs font-medium text-muted-foreground">{isAdmin ? formatCurrency(asset.valor_aquisicao) : "••••••"}</span></TableCell></TableRow>)}</TableBody></Table></div><div className="flex flex-col gap-3 border-t border-border/70 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5"><p className="text-xs text-muted-foreground">Mostrando <span className="font-medium text-foreground">{visibleRangeStart}–{visibleRangeEnd}</span> de <span className="font-medium text-foreground">{total}</span> ativos</p><div className="flex items-center gap-1.5"><Button variant="outline" size="icon" aria-label="Página anterior" disabled={page === 1 || loading} onClick={() => setPage((current) => Math.max(1, current - 1))} className="size-8 rounded-lg bg-background"><ChevronLeft className="size-3.5" /></Button><span className="min-w-16 text-center text-xs font-medium text-muted-foreground">Página {page} / {totalPages}</span><Button variant="outline" size="icon" aria-label="Próxima página" disabled={page >= totalPages || loading} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} className="size-8 rounded-lg bg-background"><ChevronRight className="size-3.5" /></Button></div></div></section>
     <section className="grid gap-3 md:grid-cols-3"><div className="rounded-2xl border border-border/70 bg-card p-4"><div className="mb-3 flex size-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><ShieldCheck className="size-4" /></div><p className="text-sm font-semibold">RLS por perfil</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Operadores consultam e atualizam. Exclusões ficam restritas ao admin.</p></div><div className="rounded-2xl border border-border/70 bg-card p-4"><div className="mb-3 flex size-8 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700"><Search className="size-4 text-indigo-700" /></div><p className="text-sm font-semibold">Busca operacional</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Patrimônio e série são priorizados para uma conferência em segundos.</p></div><div className="rounded-2xl border border-border/70 bg-card p-4"><div className="mb-3 flex size-8 items-center justify-center rounded-xl bg-slate-100 text-slate-700"><ArrowDownToLine className="size-4" /></div><p className="text-sm font-semibold">Dados rastreáveis</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Cada registro mantém local, cliente, conservação e observações operacionais.</p></div></section>
     <div className="flex flex-col gap-2 border-t border-border/60 pt-4 text-[11px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between"><span>Mr Pay Ativos · v0.2</span><span className="flex items-center gap-1.5"><Check className="size-3 text-emerald-600" /> {user ? `${profile?.role === "admin" ? "Admin" : "Operador"} conectado` : "Modo consulta pública"}</span></div>
+    </div>}
   </div><Sheet open={sheetOpen} onOpenChange={setSheetOpen}><AssetForm asset={editingAsset} form={form} setForm={setForm} isNew={!editingAsset} isAdmin={isAdmin} saving={saving} saveCompleted={saveCompleted} onSave={() => void saveAsset()} onDelete={() => void deleteAsset()} onClose={() => setSheetOpen(false)} demoMode={!user} /></Sheet><AuthDialog open={authOpen} onOpenChange={setAuthOpen} initialMode={authMode} allowSignup={getUserCreationMode(Boolean(user), profile?.role) === "signup"} />{authLoading && <div className="pointer-events-none fixed bottom-4 right-4 rounded-full border border-border/70 bg-card/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-lg">Verificando sessão...</div>}</DashboardLayout>;
 }
