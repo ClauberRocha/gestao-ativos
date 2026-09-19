@@ -46,6 +46,7 @@ declare
   changed jsonb;
   patrimony text;
   asset_id uuid;
+  actor_id uuid;
 begin
   if (tg_op = 'DELETE') then
     changed := jsonb_build_object('old', to_jsonb(old));
@@ -61,8 +62,13 @@ begin
     asset_id := new.id;
   end if;
 
+  -- Sessões autenticadas válidas podem ainda não ter uma linha em auth.users
+  -- durante fluxos de teste/bootstrapping; nesse caso o log permanece anônimo.
+  select auth.uid() into actor_id
+  where exists (select 1 from auth.users where id = auth.uid());
+
   insert into public.audit_logs (actor_id, actor_email, action, entity_type, entity_id, asset_patrimonio, details)
-  values (auth.uid(), auth.jwt() ->> 'email', case tg_op when 'INSERT' then 'create' when 'UPDATE' then 'update' else 'delete' end, 'asset', asset_id, patrimony, changed);
+  values (actor_id, auth.jwt() ->> 'email', case tg_op when 'INSERT' then 'create' when 'UPDATE' then 'update' else 'delete' end, 'asset', asset_id, patrimony, changed);
   return coalesce(new, old);
 end;
 $$;
