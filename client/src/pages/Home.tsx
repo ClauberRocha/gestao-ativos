@@ -131,41 +131,8 @@ function KpiCard({ label, value, detail, icon: Icon, tone }: { label: string; va
   return <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-[0_10px_30px_-28px_rgba(15,23,42,0.5)]"><div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{label}</p><p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">{value}</p><p className="mt-1 text-[11px] text-muted-foreground">{detail}</p></div><div className={`flex size-9 items-center justify-center rounded-xl ${tone}`}><Icon className="size-4" /></div></div></div>;
 }
 
-const LANDING_MESSAGES = [
-  "Controle patrimonial sem pontos cegos.",
-  "Cada ativo, visível. Cada detalhe, controlado.",
-  "Gestão patrimonial para quem exige o melhor.",
-  "Automatize o controle, otimize seu tempo.",
-  "Seu patrimônio seguro, sua gestão tranquila.",
-  "Nada escapa ao seu controle patrimonial.",
-  "Precisão no controle, eficiência nos resultados.",
-] as const;
-
 function InitialAuthScreen({ onOpenAuth }: { onOpenAuth: () => void }) {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [isFading, setIsFading] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const transitionTimer = useRef<number | null>(null);
-
-  const transitionTo = useCallback((nextIndex: number) => {
-    window.clearTimeout(transitionTimer.current ?? undefined);
-    setIsFading(true);
-    transitionTimer.current = window.setTimeout(() => {
-      setActiveIndex((nextIndex + LANDING_MESSAGES.length) % LANDING_MESSAGES.length);
-      setIsFading(false);
-    }, 220);
-  }, []);
-
-  useEffect(() => {
-    if (isPaused) return;
-    const timer = window.setTimeout(() => transitionTo(activeIndex + 1), 5000);
-    return () => {
-      window.clearTimeout(timer);
-      window.clearTimeout(transitionTimer.current ?? undefined);
-    };
-  }, [activeIndex, isPaused, transitionTo]);
-
-  return <main className="flex min-h-screen items-center justify-center overflow-hidden bg-[#111a3b] px-4 py-8 text-white [background-image:radial-gradient(circle_at_20%_10%,rgba(37,99,235,0.16),transparent_35%),radial-gradient(circle_at_80%_90%,rgba(14,165,233,0.14),transparent_35%),linear-gradient(135deg,#101733,#202d65)]"><section className="w-full max-w-[420px] rounded-2xl border border-white/10 bg-white/[0.07] p-6 shadow-2xl shadow-black/20 backdrop-blur-xl sm:p-7" aria-label="Acesso ao sistema de ativos" onMouseEnter={() => setIsPaused(true)} onMouseLeave={() => setIsPaused(false)}><div className="mx-auto flex size-24 items-center justify-center bg-[#2b70aa] p-3 shadow-lg shadow-black/10"><img src={MR_PAY_LOGO_URL} alt="Mr Pay" className="max-h-full w-full object-contain" loading="eager" decoding="async" /></div><h1 className="mt-6 text-center text-2xl font-bold tracking-tight">Bem-vindo</h1><p className="mt-2 text-center text-sm text-slate-300" aria-live="polite">Faça login para acessar o sistema de ativos</p><div className="relative mt-6 min-h-[4.5rem] overflow-hidden text-center"><p className={`text-base font-semibold leading-6 text-sky-200 transition-opacity duration-300 ${isFading ? "opacity-0" : "opacity-100"}`}>{LANDING_MESSAGES[activeIndex]}</p></div><Button type="button" onClick={onOpenAuth} className="mt-4 h-11 w-full rounded-lg bg-blue-600 font-semibold text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500"><LogIn className="mr-2 size-4" />Entrar no Sistema</Button><div className="mt-5 flex justify-center gap-2" role="tablist" aria-label="Mensagens de gestão de ativos">{LANDING_MESSAGES.map((message, index) => <button key={message} type="button" role="tab" aria-label={`Exibir mensagem ${index + 1}`} aria-selected={index === activeIndex} onClick={() => transitionTo(index)} className={`h-2 rounded-full transition-all duration-300 ${index === activeIndex ? "w-6 bg-sky-400" : "w-2 bg-white/30 hover:bg-white/60"}`} />)}</div><div className="mt-6 border-t border-white/10 pt-5 text-center text-[11px] leading-5 text-slate-400"><p>Acesso restrito a usuários autorizados.</p><p>Em caso de dúvidas, entre em contato com o administrador.</p></div></section><footer className="fixed bottom-4 left-0 right-0 px-4 text-center text-[10px] text-slate-500">v. 0.2.0.1 · © 2026 Mr Pay — Todos os direitos reservados</footer></main>;
+  return <main className="flex min-h-screen items-center justify-center overflow-hidden bg-[#111a3b] px-4 py-8 text-white [background-image:radial-gradient(circle_at_20%_10%,rgba(37,99,235,0.16),transparent_35%),radial-gradient(circle_at_80%_90%,rgba(14,165,233,0.14),transparent_35%),linear-gradient(135deg,#101733,#202d65)]"><section className="w-full max-w-[420px] rounded-2xl border border-white/10 bg-white/[0.07] p-6 shadow-2xl shadow-black/20 backdrop-blur-xl sm:p-7" aria-label="Acesso ao sistema de ativos"><div className="mx-auto flex size-24 items-center justify-center bg-[#2b70aa] p-3 shadow-lg shadow-black/10"><img src={MR_PAY_LOGO_URL} alt="Mr Pay" className="max-h-full w-full object-contain" loading="eager" decoding="async" /></div><h1 className="mt-6 text-center text-2xl font-bold tracking-tight">Bem-vindo</h1><p className="mt-2 text-center text-sm text-slate-300">Faça login para acessar o sistema de ativos</p><Button type="button" onClick={onOpenAuth} className="mt-8 h-11 w-full rounded-lg bg-blue-600 font-semibold text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500"><LogIn className="mr-2 size-4" />Entrar no Sistema</Button><div className="mt-6 border-t border-white/10 pt-5 text-center text-[11px] leading-5 text-slate-400"><p>Acesso restrito a usuários autorizados.</p><p>Em caso de dúvidas, entre em contato com o administrador.</p></div></section><footer className="fixed bottom-4 left-0 right-0 px-4 text-center text-[10px] text-slate-500">v. 0.2.0.1 · © 2026 Mr Pay — Todos os direitos reservados</footer></main>;
 }
 
 export default function Home() {
