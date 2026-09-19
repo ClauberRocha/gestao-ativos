@@ -31,9 +31,7 @@ describe("asset operations", () => {
 
   it("propagates the Supabase error instead of masking a failed save", async () => {
     const error = new Error("permission denied");
-    const single = vi.fn().mockResolvedValue({ data: null, error });
-    const select = vi.fn(() => ({ single }));
-    const insert = vi.fn(() => ({ select }));
+    const insert = vi.fn().mockResolvedValue({ data: null, error });
     const client = clientFrom({ from: vi.fn(() => ({ insert })) });
 
     await expect(saveAssetRecord(client, null, {
@@ -48,6 +46,25 @@ describe("asset operations", () => {
       extra_data: {},
       valor_aquisicao: null,
     })).rejects.toThrow("permission denied");
+  });
+
+  it("creates a new asset without requiring a post-insert read", async () => {
+    const insert = vi.fn().mockResolvedValue({ data: null, error: null });
+    const client = clientFrom({ from: vi.fn(() => ({ insert })) });
+
+    await expect(saveAssetRecord(client, null, {
+      patrimonio: "MR PAY 0003",
+      descricao: "TOTEM",
+      numero_serie: "789",
+      conta_cliente: "SEFAZ",
+      local: "São Paulo",
+      status: "Em estoque",
+      conservacao: "Novo",
+      observacoes: null,
+      extra_data: {},
+      valor_aquisicao: null,
+    })).resolves.toBeNull();
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ patrimonio: "MR PAY 0003" }));
   });
 
   it("uses the protected clear_assets RPC and returns the removed count", async () => {

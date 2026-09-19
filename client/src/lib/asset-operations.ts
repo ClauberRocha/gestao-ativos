@@ -16,7 +16,9 @@ export async function saveAssetRecord(
     return result.data;
   }
 
-  const result = await client.from("assets").insert(payload).select("id").single();
+  // A criação não precisa ler o registro recém-inserido; evitar o SELECT
+  // mantém o fluxo compatível com as permissões de coluna do RLS.
+  const result = await client.from("assets").insert(payload);
   if (result.error) throw result.error;
   return result.data;
 }
