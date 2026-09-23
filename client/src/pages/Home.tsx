@@ -284,7 +284,13 @@ export default function Home() {
       toast.success(ASSET_SAVED_MESSAGE, { description: `${form.patrimonio} foi salvo no inventário.` });
       setSaveCompleted(true);
       await loadAssets();
-    } catch (error) { toast.error("Não foi possível salvar", { description: error instanceof Error ? error.message : "Verifique os campos e tente novamente." }); }
+    } catch (error) {
+      const saveError = error as { code?: string; message?: string };
+      const duplicateMessage = saveError.code === "23505"
+        ? "Patrimônio ou número de série já cadastrado. Informe um identificador exclusivo."
+        : saveError.message || "Verifique os campos e tente novamente.";
+      toast.error("Não foi possível salvar", { description: duplicateMessage });
+    }
     finally { setSaving(false); }
   };
 
