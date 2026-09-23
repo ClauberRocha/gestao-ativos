@@ -68,6 +68,13 @@ export function filterAssetRows(rows: Asset[], filters: AssetFilters) {
 }
 
 const FILTER_STORAGE_KEY = "mr-pay-ativos-filters";
+const TABLE_VIEW_STORAGE_KEY = "mr-pay-ativos-table-view";
+type PersistedTableView = { filters?: Partial<AssetFilters>; sortKey?: AssetSortKey; sortDirection?: "asc" | "desc"; pageSize?: number };
+
+function readPersistedTableView(): PersistedTableView {
+  if (typeof window === "undefined") return {};
+  try { return JSON.parse(localStorage.getItem(TABLE_VIEW_STORAGE_KEY) ?? "{}") as PersistedTableView; } catch { return {}; }
+}
 
 const emptyForm: AssetFormData = {
   patrimonio: "",
@@ -145,25 +152,27 @@ function InitialAuthScreen({ onOpenAuth }: { onOpenAuth: () => void }) {
 
 export default function Home() {
   const { user, loading: authLoading } = useSupabaseAuth();
+  const persistedView = readPersistedTableView();
+  const persistedFilters = persistedView.filters ?? {};
   const [profile, setProfile] = useState<Profile | null>(null);
   const [assets, setAssets] = useState<Asset[]>(sampleAssets.slice(0, 10));
   const [total, setTotal] = useState(sampleAssets.length);
   const [metrics, setMetrics] = useState({ total: sampleAssets.length, stock: 3, clients: 7, defects: 2 });
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<StatusFilter>("Todos");
-  const [conservacao, setConservacao] = useState("");
-  const [contaCliente, setContaCliente] = useState("");
-  const [createdFrom, setCreatedFrom] = useState("");
-  const [createdTo, setCreatedTo] = useState("");
-  const [modifiedFrom, setModifiedFrom] = useState("");
-  const [modifiedTo, setModifiedTo] = useState("");
+  const [query, setQuery] = useState(persistedFilters.query ?? "");
+  const [status, setStatus] = useState<StatusFilter>(persistedFilters.status ?? "Todos");
+  const [conservacao, setConservacao] = useState(persistedFilters.conservacao ?? "");
+  const [contaCliente, setContaCliente] = useState(persistedFilters.contaCliente ?? "");
+  const [createdFrom, setCreatedFrom] = useState(persistedFilters.createdFrom ?? "");
+  const [createdTo, setCreatedTo] = useState(persistedFilters.createdTo ?? "");
+  const [modifiedFrom, setModifiedFrom] = useState(persistedFilters.modifiedFrom ?? "");
+  const [modifiedTo, setModifiedTo] = useState(persistedFilters.modifiedTo ?? "");
   const [savedFilters, setSavedFilters] = useState<AssetFilters | null>(() => {
     try { return JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY) ?? "null") as AssetFilters | null; } catch { return null; }
   });
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(10);
-  const [sortKey, setSortKey] = useState<AssetSortKey>("updated_at");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(PAGE_SIZE_OPTIONS.includes(persistedView.pageSize as (typeof PAGE_SIZE_OPTIONS)[number]) ? persistedView.pageSize as (typeof PAGE_SIZE_OPTIONS)[number] : 10);
+  const [sortKey, setSortKey] = useState<AssetSortKey>(persistedView.sortKey ?? "updated_at");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">(persistedView.sortDirection ?? "desc");
   const [loading, setLoading] = useState(false);
   const [usingDemoData, setUsingDemoData] = useState(true);
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -190,6 +199,15 @@ export default function Home() {
   }, [showLogs, user, isAdmin]);
 
   useEffect(() => { void loadAuditLogs(); }, [loadAuditLogs]);
+
+  useEffect(() => {
+    localStorage.setItem(TABLE_VIEW_STORAGE_KEY, JSON.stringify({
+      filters: { query, status, conservacao, contaCliente, createdFrom, createdTo, modifiedFrom, modifiedTo },
+      sortKey,
+      sortDirection,
+      pageSize,
+    }));
+  }, [query, status, conservacao, contaCliente, createdFrom, createdTo, modifiedFrom, modifiedTo, sortKey, sortDirection, pageSize]);
 
   const loadProfile = useCallback(async () => {
     if (!user) { setProfile(null); return; }
