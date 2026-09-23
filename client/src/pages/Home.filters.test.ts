@@ -16,4 +16,10 @@ describe("asset advanced filters", () => {
     const result = filterAssetRows(sampleAssets, { ...baseFilters, modifiedFrom: "2099-01-01" });
     expect(result).toEqual([]);
   });
+
+  it("finds assets by description as well as identifiers", () => {
+    const first = sampleAssets[0];
+    const result = filterAssetRows(sampleAssets, { ...baseFilters, query: first.descricao });
+    expect(result.some((asset) => asset.id === first.id)).toBe(true);
+  });
 });
