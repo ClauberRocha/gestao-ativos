@@ -314,7 +314,18 @@ export default function Home() {
     setSaveCompleted(false);
     setSaving(true);
     try {
-      const payload = { ...form, conta_cliente: form.conta_cliente || null, local: form.local || null, conservacao: form.conservacao || null, observacoes: form.observacoes || null, valor_aquisicao: isAdmin ? form.valor_aquisicao : undefined, extra_data: editingAsset?.extra_data ?? {} };
+      const patrimonio = form.patrimonio.trim();
+      const { data: matchingAssets, error: duplicateLookupError } = await supabase
+        .from("assets_inventory")
+        .select("id, patrimonio")
+        .ilike("patrimonio", patrimonio)
+        .limit(5);
+      const duplicate = !duplicateLookupError && (matchingAssets ?? []).find((asset) => asset.id !== editingAsset?.id);
+      if (duplicate) {
+        toast.error("Patrimônio já cadastrado", { description: `O patrimônio "${duplicate.patrimonio}" já está cadastrado no inventário.` });
+        return;
+      }
+      const payload = { ...form, patrimonio, conta_cliente: form.conta_cliente || null, local: form.local || null, conservacao: form.conservacao || null, observacoes: form.observacoes || null, valor_aquisicao: isAdmin ? form.valor_aquisicao : undefined, extra_data: editingAsset?.extra_data ?? {} };
       await saveAssetRecord(supabase, editingAsset?.id ?? null, payload);
       toast.success(ASSET_SAVED_MESSAGE, { description: `${form.patrimonio} foi salvo no inventário.` });
       setSaveCompleted(true);
@@ -322,7 +333,7 @@ export default function Home() {
     } catch (error) {
       const saveError = error as { code?: string; message?: string };
       const duplicateMessage = saveError.code === "23505"
-        ? "Patrimônio ou número de série já cadastrado. Informe um identificador exclusivo."
+        ? "O patrimônio informado ou o número de série já está cadastrado. Informe um identificador exclusivo."
         : saveError.message || "Verifique os campos e tente novamente.";
       toast.error("Não foi possível salvar", { description: duplicateMessage });
     }
