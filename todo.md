@@ -48,3 +48,18 @@
 - [x] Criar tela/menu de Logs com filtros, detalhes de alterações e acesso restrito a administradores.
 - [x] Expandir filtros do inventário para Patrimônio, status, conservação, conta cliente e intervalo de datas.
 - [x] Adicionar testes de UI, integração, permissões e documentação para os fluxos de importação, exportação, limpeza e logs.
+
+## Recomendações Prioritárias
+
+- [ ] **Implementar Soft Delete (Exclusão Lógica)**
+  - **Situação atual:** A exclusão remove a linha física da tabela `assets` (registrando histórico no `audit_logs`).
+  - **Recomendação:** Adicionar coluna `deleted_at timestamptz` para permitir restauração rápida de ativos excluídos por engano.
+
+- [ ] **Módulo de Movimentação / Custódia**
+  - **Recomendação:** Criar tabela `asset_movements` para registrar formalmente transferências de localidade e assinaturas/termos de entrega aos clientes.
+
+- [ ] **Leitura de Código de Barras / QR Code**
+  - **Recomendação:** Integrar leitor de câmera (HTML5 QR Scanner) para auditoria e conferência física em campo.
+
+- [ ] **Multi-tenant / Segregação por Filial**
+  - **Recomendação:** Se a MR PAY operar filiais independentes sem visibilidade cruzada, parametrizar `tenant_id` ou `branch_id` nas RLS policies.
