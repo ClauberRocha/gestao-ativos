@@ -18,16 +18,16 @@ import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
 import { getThemeToggleLabel, getThemeToggleTitle } from "@/lib/theme";
-import { MR_PAY_LOGO_URL } from "@/lib/brand";
 import { recordAudit } from "@/lib/audit";
 import { canCreateUsers } from "@/lib/user-permissions";
-import { Archive, BarChart3, ChevronRight, ClipboardList, LogIn, LogOut, Moon, PanelLeft, Settings2, Sun, UserRound } from "lucide-react";
+import { Archive, BarChart3, ChevronRight, ClipboardList, LogIn, LogOut, Moon, PanelLeft, Settings2, Sun, UserRound, Users } from "lucide-react";
 import React, { CSSProperties, useEffect, useRef, useState } from "react";
 
 const menuItems = [
   { icon: BarChart3, label: "Visão geral", active: false },
   { icon: Archive, label: "Inventário", active: true },
   { icon: ClipboardList, label: "Logs", active: false, adminOnly: true },
+  { icon: Users, label: "Usuários", active: false, adminOnly: true },
 ];
 
 const SIDEBAR_WIDTH_KEY = "asset-sidebar-width";
@@ -43,6 +43,7 @@ export default function DashboardLayout({
   onOverviewClick,
   onInventoryClick,
   onLogsClick,
+  onUsersClick,
 }: {
   children: React.ReactNode;
   onOpenAuth: () => void;
@@ -51,6 +52,7 @@ export default function DashboardLayout({
   onOverviewClick: () => void;
   onInventoryClick: () => void;
   onLogsClick?: () => void;
+  onUsersClick?: () => void;
 }) {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
@@ -87,6 +89,7 @@ export default function DashboardLayout({
         onOverviewClick={onOverviewClick}
         onInventoryClick={onInventoryClick}
         onLogsClick={onLogsClick ?? (() => undefined)}
+        onUsersClick={onUsersClick ?? (() => undefined)}
         onSignOut={handleSignOut}
         signOutPending={signOutPending}
       >
@@ -106,15 +109,16 @@ type LayoutContentProps = {
   onOverviewClick: () => void;
   onInventoryClick: () => void;
   onLogsClick?: () => void;
+  onUsersClick?: () => void;
   onSignOut: () => Promise<void>;
   signOutPending: boolean;
 };
 
-function DashboardLayoutContent({ children, setSidebarWidth, user, onOpenAuth, onOpenUserCreate, isAdmin, onOverviewClick, onInventoryClick, onLogsClick, onSignOut, signOutPending }: LayoutContentProps) {
+function DashboardLayoutContent({ children, setSidebarWidth, user, onOpenAuth, onOpenUserCreate, isAdmin, onOverviewClick, onInventoryClick, onLogsClick, onUsersClick, onSignOut, signOutPending }: LayoutContentProps) {
   const { state, toggleSidebar } = useSidebar();
   const { theme, toggleTheme } = useTheme();
   const isCollapsed = state === "collapsed";
-  const [activeMenu, setActiveMenu] = useState(() => window.location.hash === "#visao-geral" ? "Visão geral" : window.location.hash === "#logs" ? "Logs" : "Inventário");
+  const [activeMenu, setActiveMenu] = useState(() => window.location.hash === "#visao-geral" ? "Visão geral" : window.location.hash === "#logs" ? "Logs" : window.location.hash === "#usuarios" ? "Usuários" : "Inventário");
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
@@ -157,9 +161,6 @@ function DashboardLayoutContent({ children, setSidebarWidth, user, onOpenAuth, o
               </button>
               {!isCollapsed && (
                 <div className="min-w-0">
-                  <div className="mb-2 flex h-10 w-[124px] items-center rounded-md bg-white px-2 py-1 shadow-sm ring-1 ring-white/10 dark:bg-white">
-                    <img src={MR_PAY_LOGO_URL} alt="Mr Pay" loading="eager" decoding="async" className="h-auto max-h-9 w-full object-contain object-left" onError={(event) => { event.currentTarget.style.display = "none"; }} />
-                  </div>
                   <div className="flex items-center gap-2">
                     <span className="size-2 rounded-full bg-emerald-500" />
                     <span className="truncate text-sm font-semibold tracking-tight">Mr Pay Ativos</span>
@@ -177,10 +178,10 @@ function DashboardLayoutContent({ children, setSidebarWidth, user, onOpenAuth, o
                   <SidebarMenuButton
                     isActive={activeMenu === item.label}
                     tooltip={item.label}
-                    data-testid={item.label === "Visão geral" ? "overview-button" : item.label === "Logs" ? "logs-button" : "inventory-button"}
+                    data-testid={item.label === "Visão geral" ? "overview-button" : item.label === "Logs" ? "logs-button" : item.label === "Usuários" ? "users-button" : "inventory-button"}
                     data-active={activeMenu === item.label ? "true" : "false"}
                     className={cn("h-10 rounded-xl px-3 text-sm", activeMenu === item.label && "font-semibold")}
-                    onClick={() => { setActiveMenu(item.label); if (item.label === "Visão geral") onOverviewClick(); else if (item.label === "Logs") onLogsClick?.(); else onInventoryClick(); }}
+                    onClick={() => { setActiveMenu(item.label); if (item.label === "Visão geral") onOverviewClick(); else if (item.label === "Logs") onLogsClick?.(); else if (item.label === "Usuários") onUsersClick?.(); else onInventoryClick(); }}
                   >
                     <item.icon className="size-4" />
                     <span>{item.label}</span>
@@ -189,7 +190,6 @@ function DashboardLayoutContent({ children, setSidebarWidth, user, onOpenAuth, o
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
-            {canCreateUsers(Boolean(user), isAdmin ? "admin" : "operador") && <div className="mt-3 px-1"><Button data-testid="create-user-button" onClick={onOpenUserCreate} variant="outline" size={isCollapsed ? "icon" : "sm"} title="Criar usuário" className="w-full border-sidebar-border bg-transparent text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"><UserRound className="size-3.5" />{!isCollapsed && <span className="ml-2">Criar usuário</span>}</Button></div>}
             {!isCollapsed && (
               <div className="mt-8 rounded-2xl border border-sidebar-border bg-sidebar-accent/50 p-3">
                 <div className="flex items-center gap-2 text-sidebar-foreground/65">

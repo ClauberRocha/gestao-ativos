@@ -10,6 +10,7 @@ vi.mock("@/hooks/useSupabaseAuth", () => ({
   useSupabaseAuth: () => ({
     signIn: vi.fn(),
     signUp: vi.fn(),
+    sendInvite: vi.fn(),
   }),
 }));
 
@@ -25,9 +26,10 @@ describe("AuthDialog user creation flow", () => {
     );
 
     expect(screen.getByTestId("user-create-dialog")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Criar acesso operacional" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Convidar usuário" })).toBeTruthy();
     expect(screen.getByLabelText("Nome completo")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Criar conta" })).toBeTruthy();
+    expect(screen.getByLabelText("Tipo de usuário")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Enviar convite" })).toBeTruthy();
   });
 
   it("does not expose signup when the flag is disabled", () => {

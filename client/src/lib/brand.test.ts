@@ -7,6 +7,6 @@ describe("Mr Pay Ativos brand configuration", () => {
   });
 
   it("uses the official persistent Mr Pay logo asset", () => {
-    expect(MR_PAY_LOGO_URL).toBe("/manus-storage/mr-pay-logo_129989d0.svg");
+    expect(MR_PAY_LOGO_URL).toBe("/manus-storage/logo-1_50898b3b.png");
   });
 });

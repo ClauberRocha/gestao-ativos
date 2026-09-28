@@ -38,5 +38,7 @@ export type Asset = {
 export type Profile = {
   id: string;
   full_name: string | null;
-  role: "admin" | "operador";
+  email?: string | null;
+  role: "admin" | "gestor" | "usuario" | "operador";
+  created_at?: string;
 };

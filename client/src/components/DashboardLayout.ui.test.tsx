@@ -71,10 +71,10 @@ describe("DashboardLayout user creation controls", () => {
     vi.mocked(toast.error).mockClear();
     window.history.replaceState(null, "", "/");
   });
-  it("renders both create-user entry points for an authenticated admin", () => {
+  it("renders the header create-user entry point for an authenticated admin", () => {
     renderLayout(true);
-    expect(screen.getByTestId("create-user-button")).toBeTruthy();
     expect(screen.getByTestId("create-user-header-button")).toBeTruthy();
+    expect(screen.queryByTestId("create-user-button")).toBeNull();
   });
 
   it("hides create-user entry points for a non-admin", () => {
@@ -90,6 +90,12 @@ describe("DashboardLayout user creation controls", () => {
     const inventory = screen.getByTestId("inventory-button");
     expect(overview.compareDocumentPosition(inventory) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByTestId("logs-button")).toBeTruthy();
+    expect(screen.getByTestId("users-button")).toBeTruthy();
+  });
+
+  it("hides the Usuários menu for a non-admin", () => {
+    renderLayout(false);
+    expect(screen.queryByTestId("users-button")).toBeNull();
   });
 
   it("calls the Logs navigation callback for an admin", () => {
@@ -102,9 +108,10 @@ describe("DashboardLayout user creation controls", () => {
 
   it("opens the signup dialog when the admin clicks Criar usuário", () => {
     renderAdminUserCreateFlow();
-    fireEvent.click(screen.getByTestId("create-user-button"));
+    fireEvent.click(screen.getByTestId("create-user-header-button"));
     expect(screen.getByTestId("user-create-dialog")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Criar acesso operacional" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Convidar usuário" })).toBeTruthy();
+    expect(screen.getByLabelText("Tipo de usuário")).toBeTruthy();
   });
 
   it("calls signOut when the user clicks Sair", async () => {

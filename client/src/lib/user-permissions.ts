@@ -1,4 +1,4 @@
-export type UserRole = "admin" | "operador";
+export type UserRole = "admin" | "gestor" | "usuario" | "operador";
 
 export function canCreateUsers(isAuthenticated: boolean, role: UserRole | null | undefined): boolean {
   return isAuthenticated && role === "admin";

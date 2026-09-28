@@ -31,11 +31,23 @@ export function useSupabaseAuth() {
     return result.data;
   }, []);
 
-  const signUp = useCallback(async (email: string, password: string, fullName: string) => {
+  const signUp = useCallback(async (email: string, password: string, fullName: string, userType: "admin" | "gestor" | "usuario") => {
     const result = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: { data: { full_name: fullName, user_type: userType } },
+    });
+    if (result.error) throw result.error;
+    return result.data;
+  }, []);
+
+  const sendInvite = useCallback(async (email: string, fullName: string, userType: "admin" | "gestor" | "usuario") => {
+    const result = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        data: { full_name: fullName, user_type: userType },
+        emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+      },
     });
     if (result.error) throw result.error;
     return result.data;
@@ -53,6 +65,7 @@ export function useSupabaseAuth() {
     isAuthenticated: Boolean(session),
     signIn,
     signUp,
+    sendInvite,
     signOut,
   };
 }
